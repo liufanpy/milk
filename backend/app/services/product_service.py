@@ -35,6 +35,17 @@ class ProductService:
     def delete_product(self, product_id: int):
         return self.repo.delete(product_id)
 
+    def export_csv(self) -> str:
+        products = self.repo.get_all(limit=10000)
+        headers = ["名称", "品牌", "分类", "单位", "条码", "零售默认价", "批发默认价", "保质期天"]
+        lines = [",".join(headers)]
+        for p in products:
+            lines.append(",".join([
+                p.name, p.brand, p.category, p.unit, p.barcode,
+                str(p.default_retail_price), str(p.default_wholesale_price), str(p.shelf_life_days),
+            ]))
+        return "\n".join(lines)
+
     def import_preview(self, file_content: bytes) -> dict:
         def validate(row: dict) -> str | bool:
             name = (row.get("name") or row.get("名称") or "").strip()

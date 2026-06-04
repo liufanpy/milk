@@ -72,6 +72,7 @@ export default function ProductsPage() {
         <h2 className="text-xl font-bold">产品管理</h2>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button variant="secondary" onClick={() => window.open('/api/products/export')}>导出 CSV</Button>
           <Button onClick={openCreate}>+ 新增产品</Button>
         </div>
       </div>

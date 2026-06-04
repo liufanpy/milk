@@ -111,6 +111,7 @@ export default function CustomersPage() {
         <h2 className="text-xl font-bold">客户管理</h2>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button variant="secondary" onClick={() => window.open('/api/customers/export')}>导出 CSV</Button>
           <Button onClick={openCreate}>+ 新增客户</Button>
         </div>
       </div>

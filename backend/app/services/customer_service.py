@@ -40,6 +40,14 @@ class CustomerService:
     def delete_price(self, price_id: int):
         return self.price_repo.delete(price_id)
 
+    def export_csv(self) -> str:
+        customers = self.repo.get_all(limit=10000)
+        headers = ["名称", "电话", "地址", "价格档位", "默认结账"]
+        lines = [",".join(headers)]
+        for c in customers:
+            lines.append(",".join([c.name, c.phone, c.address, c.price_tier, c.default_payment]))
+        return "\n".join(lines)
+
     def import_preview(self, file_content: bytes) -> dict:
         def validate(row: dict) -> str | bool:
             name = (row.get("name") or row.get("名称") or "").strip()

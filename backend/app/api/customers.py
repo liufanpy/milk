@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.customer_service import CustomerService
 from app.schemas.customer import CustomerCreate, CustomerUpdate, CustomerOut
+import io
 
 router = APIRouter(prefix="/api/customers", tags=["customers"])
 
@@ -17,6 +19,16 @@ def list_customers(
     svc: CustomerService = Depends(get_customer_service),
 ):
     return svc.list_customers(keyword)
+
+
+@router.get("/export")
+def export_customers(svc: CustomerService = Depends(get_customer_service)):
+    csv_content = svc.export_csv()
+    return StreamingResponse(
+        io.BytesIO(csv_content.encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=customers.csv"},
+    )
 
 
 @router.get("/{customer_id}", response_model=CustomerOut)

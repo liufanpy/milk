@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.product_service import ProductService
 from app.schemas.product import ProductCreate, ProductUpdate, ProductOut
+import io
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
@@ -17,6 +19,16 @@ def list_products(
     svc: ProductService = Depends(get_product_service),
 ):
     return svc.list_products(keyword)
+
+
+@router.get("/export")
+def export_products(svc: ProductService = Depends(get_product_service)):
+    csv_content = svc.export_csv()
+    return StreamingResponse(
+        io.BytesIO(csv_content.encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=products.csv"},
+    )
 
 
 @router.get("/{product_id}", response_model=ProductOut)
