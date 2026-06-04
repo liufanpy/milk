@@ -13,6 +13,16 @@ class DeliveryService:
         self.txn_repo = TransactionRepository(db)
 
     def create_delivery(self, data: DeliveryCreate):
+        # 库存校验
+        inventory = {
+            (r.product_id, r.shelf_id): r.stock
+            for r in self.stock_repo.get_inventory()
+        }
+        for item in data.items:
+            stock = inventory.get((item.product_id, item.shelf_id), 0)
+            if stock < item.quantity:
+                raise ValueError(f"产品库存不足，当前库存 {stock}，需要 {item.quantity}")
+
         delivery = self.delivery_repo.create(
             customer_id=data.customer_id,
             delivery_date=data.delivery_date,
@@ -30,7 +40,7 @@ class DeliveryService:
                 "product_id": item.product_id,
                 "shelf_id": item.shelf_id,
                 "direction": "out",
-                "reason": "sale",
+                "reason": "delivery",
                 "quantity": item.quantity,
                 "unit_cost": 0.0,
                 "delivery_id": delivery.id,
@@ -41,7 +51,7 @@ class DeliveryService:
         if total > 0:
             self.txn_repo.create(
                 customer_id=data.customer_id,
-                category="sale",
+                category="delivery",
                 amount=total,
                 delivery_id=delivery.id,
             )
