@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, date
 from sqlalchemy.orm import Session
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.schemas.purchase import PurchaseCreate
-from app.services.csv_importer import parse_csv
+from app.models.purchase_order import PurchaseOrder
 from app.models.product import Product
 from app.models.shelf import Shelf
 from app.models.supplier import Supplier
@@ -17,34 +17,196 @@ class PurchaseService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
+    # ── 单号生成 ──────────────────────────────────
+
+    def _next_order_number(self) -> str:
+        today = date.today().strftime("%Y%m%d")
+        prefix = f"PO-{today}-"
+        last = (
+            self.db.query(PurchaseOrder)
+            .filter(PurchaseOrder.order_number.like(f"{prefix}%"))
+            .order_by(PurchaseOrder.id.desc())
+            .first()
+        )
+        if last:
+            seq = int(last.order_number.split("-")[-1]) + 1
+        else:
+            seq = 1
+        return f"{prefix}{seq:03d}"
+
+    # ── 创建进货单 ────────────────────────────────
+
     def create_purchase(self, data: PurchaseCreate):
-        total = 0.0
-        movements = []
-        for item in data.items:
-            total += item.quantity * item.unit_cost
-            movements.append({
-                "product_id": item.product_id,
-                "shelf_id": item.shelf_id,
-                "direction": "in",
-                "reason": "purchase",
-                "quantity": item.quantity,
-                "unit_cost": item.unit_cost,
-            })
+        total = sum(item.quantity * item.unit_cost for item in data.items)
+        order = PurchaseOrder(
+            order_number=self._next_order_number(),
+            supplier_id=data.supplier_id,
+            purchase_date=data.purchase_date,
+            total_amount=total,
+            note=data.note,
+            status=data.status,
+        )
+        self.db.add(order)
+        self.db.flush()
 
-        self.stock_repo.bulk_create(movements)
-
-        if total > 0:
-            self.txn_repo.create(
-                supplier_id=data.supplier_id,
-                category="purchase",
-                amount=total,
-            )
+        if data.status == "confirmed":
+            self._confirm_items(order.id, data.items)
 
         self.db.commit()
-        return {"total": total, "item_count": len(data.items)}
+        return {"id": order.id, "order_number": order.order_number, "status": order.status}
+
+    # ── 确认草稿单 ────────────────────────────────
+
+    def confirm_order(self, order_id: int, items: list | None = None):
+        order = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == order_id).first()
+        if not order:
+            raise ValueError("进货单不存在")
+        if order.status != "draft":
+            raise ValueError("仅草稿状态可确认")
+
+        if items:
+            total = sum(it["quantity"] * it["unit_cost"] for it in items)
+            order.total_amount = total
+        else:
+            items = []
+
+        order.status = "confirmed"
+        self._confirm_items(order_id, items)
+        self.db.commit()
+        return {"id": order.id, "status": "confirmed"}
+
+    def _confirm_items(self, order_id: int, items: list):
+        total = 0.0
+        movements = []
+        for item in items:
+            qty = item["quantity"] if isinstance(item, dict) else item.quantity
+            cost = item["unit_cost"] if isinstance(item, dict) else item.unit_cost
+            total += qty * cost
+            movements.append({
+                "product_id": item["product_id"] if isinstance(item, dict) else item.product_id,
+                "shelf_id": item["shelf_id"] if isinstance(item, dict) else item.shelf_id,
+                "direction": "in",
+                "reason": "purchase",
+                "quantity": qty,
+                "unit_cost": cost,
+                "purchase_order_id": order_id,
+            })
+
+        if movements:
+            self.stock_repo.bulk_create(movements)
+
+        order = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == order_id).first()
+        if total > 0:
+            self.txn_repo.create(
+                supplier_id=order.supplier_id,
+                category="purchase",
+                amount=total,
+                purchase_order_id=order_id,
+            )
+
+    # ── 撤销进货单 ────────────────────────────────
+
+    def cancel_order(self, order_id: int):
+        order = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == order_id).first()
+        if not order:
+            raise ValueError("进货单不存在")
+
+        if order.status == "draft":
+            order.status = "cancelled"
+            self.db.commit()
+            return {"id": order.id, "status": "cancelled"}
+
+        if order.status == "confirmed":
+            # 反向冲抵库存
+            original_items = self.stock_repo.get_by_purchase_order(order_id)
+            reverses = []
+            reverse_total = 0.0
+            for item in original_items:
+                reverses.append({
+                    "product_id": item.product_id,
+                    "shelf_id": item.shelf_id,
+                    "direction": "out",
+                    "reason": "purchase_cancel",
+                    "quantity": item.quantity,
+                    "unit_cost": item.unit_cost,
+                    "purchase_order_id": order_id,
+                })
+                reverse_total += item.quantity * item.unit_cost
+
+            if reverses:
+                self.stock_repo.bulk_create(reverses)
+            if reverse_total > 0:
+                self.txn_repo.create(
+                    supplier_id=order.supplier_id,
+                    category="purchase_cancel",
+                    amount=-reverse_total,
+                    purchase_order_id=order_id,
+                )
+
+            order.status = "cancelled"
+            order.updated_at = datetime.utcnow()
+            self.db.commit()
+            return {"id": order.id, "status": "cancelled"}
+
+    # ── 列表 ──────────────────────────────────────
 
     def list_purchases(self):
-        return self.stock_repo.list_all()
+        orders = (
+            self.db.query(PurchaseOrder)
+            .order_by(PurchaseOrder.created_at.desc())
+            .all()
+        )
+        suppliers = {s.id: s.name for s in self.db.query(Supplier).all()}
+        return [
+            {
+                "id": o.id,
+                "order_number": o.order_number,
+                "supplier_id": o.supplier_id,
+                "supplier_name": suppliers.get(o.supplier_id, ""),
+                "purchase_date": str(o.purchase_date),
+                "total_amount": o.total_amount,
+                "status": o.status,
+                "note": o.note,
+                "created_at": str(o.created_at),
+            }
+            for o in orders
+        ]
+
+    # ── 详情 ──────────────────────────────────────
+
+    def get_purchase_detail(self, order_id: int):
+        order = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == order_id).first()
+        if not order:
+            return None
+        items = self.stock_repo.get_by_purchase_order(order_id)
+        products = {p.id: p.name for p in self.db.query(Product).all()}
+        shelves = {s.id: s.name for s in self.db.query(Shelf).all()}
+        suppliers = {s.id: s.name for s in self.db.query(Supplier).all()}
+
+        def item_dir(i):
+            return {
+                "product_id": i.product_id,
+                "product_name": products.get(i.product_id, ""),
+                "quantity": i.quantity,
+                "unit_cost": i.unit_cost,
+                "shelf_id": i.shelf_id,
+                "shelf_name": shelves.get(i.shelf_id, ""),
+            }
+
+        return {
+            "id": order.id,
+            "order_number": order.order_number,
+            "supplier_id": order.supplier_id,
+            "supplier_name": suppliers.get(order.supplier_id, ""),
+            "purchase_date": str(order.purchase_date),
+            "total_amount": order.total_amount,
+            "status": order.status,
+            "note": order.note,
+            "created_at": str(order.created_at),
+            "items": [item_dir(i) for i in items],
+        }
+
+    # ── CSV 导入（保持兼容，直接创建 confirmed 单） ──
 
     DFLT_SUPPLIER = "金健牛奶"
     DFLT_SHELF = "小欢的牛奶店"
@@ -78,6 +240,7 @@ class PurchaseService:
                 return f"供应商'{supname}'不存在"
             return True
 
+        from app.services.csv_importer import parse_csv
         return parse_csv(file_content, validate, PURCHASE_HEADERS)
 
     def import_confirm(self, rows: list[dict]) -> dict:
@@ -100,6 +263,16 @@ class PurchaseService:
                     errors.append({"row": item.get("index", "?"), "msg": f"供应商'{supname}'不存在"})
                 continue
 
+            order = PurchaseOrder(
+                order_number=self._next_order_number(),
+                supplier_id=sid,
+                purchase_date=date.today(),
+                total_amount=0.0,
+                status="confirmed",
+            )
+            self.db.add(order)
+            self.db.flush()
+
             total = 0.0
             movements = []
             for data in items:
@@ -118,25 +291,24 @@ class PurchaseService:
                 cost = data.get("进价") or data.get("unit_cost") or ""
                 cost = float(cost) if cost else default_cost
                 date_str = (data.get("日期") or data.get("date") or "").strip()
-                if date_str:
-                    try:
-                        created_at = datetime.strptime(date_str, "%Y-%m-%d")
-                    except ValueError:
-                        created_at = datetime.utcnow()
-                else:
-                    created_at = datetime.utcnow()
+                try:
+                    item_date = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else date.today()
+                except ValueError:
+                    item_date = date.today()
                 total += qty * cost
                 movements.append({
                     "product_id": pid, "shelf_id": shelf_id,
                     "direction": "in", "reason": "purchase",
                     "quantity": qty, "unit_cost": cost,
-                    "created_at": created_at,
+                    "purchase_order_id": order.id,
+                    "created_at": datetime.utcnow() if not date_str else datetime.strptime(date_str, "%Y-%m-%d"),
                 })
 
             if movements:
                 self.stock_repo.bulk_create(movements)
                 if total > 0:
-                    self.txn_repo.create(supplier_id=sid, category="purchase", amount=total)
+                    self.txn_repo.create(supplier_id=sid, category="purchase", amount=total, purchase_order_id=order.id)
+                order.total_amount = total
                 success += len(movements)
 
         self.db.commit()
