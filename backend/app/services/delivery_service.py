@@ -91,6 +91,12 @@ class DeliveryService:
         if not delivery:
             raise ValueError("送货单不存在")
 
+        # 计算旧 delivery 净额（当前应收）
+        old_transactions = self.txn_repo.get_by_delivery(delivery_id)
+        old_total = sum(t.amount for t in old_transactions if t.category == "delivery") + \
+                    sum(t.amount for t in old_transactions if t.category == "delivery_cancel")
+
+        # return_items: 退货回库，stock_movement(reason=return)
         return_total = 0.0
         for item in data.return_items:
             amt = item.quantity * item.unit_price
@@ -104,34 +110,45 @@ class DeliveryService:
                 "delivery_id": delivery_id,
             }])
 
-        if return_total > 0:
-            self.txn_repo.create(
-                customer_id=delivery.customer_id,
-                category="refund",
-                amount=return_total,
-                delivery_id=delivery_id,
-            )
-
+        # new_items: 出货，stock_movement(reason=delivery)，带库存校验
+        inventory = {
+            (r.product_id, r.shelf_id): r.stock
+            for r in self.stock_repo.get_inventory()
+        }
         new_total = 0.0
         for item in data.new_items:
+            stock = inventory.get((item.product_id, item.shelf_id), 0)
+            if stock < item.quantity:
+                raise ValueError(f"产品库存不足，当前库存 {stock}，需要 {item.quantity}")
             amt = item.quantity * item.unit_price
             new_total += amt
             self.stock_repo.bulk_create([{
                 "product_id": item.product_id,
                 "shelf_id": item.shelf_id,
                 "direction": "out",
-                "reason": "sale",
+                "reason": "delivery",
                 "quantity": item.quantity,
                 "delivery_id": delivery_id,
             }])
 
+        # transaction: 冲抵旧的 delivery + 新建新的 delivery
+        if old_total != 0:
+            self.txn_repo.create(
+                customer_id=delivery.customer_id,
+                category="delivery_cancel",
+                amount=-old_total,
+                delivery_id=delivery_id,
+            )
         if new_total > 0:
             self.txn_repo.create(
                 customer_id=delivery.customer_id,
-                category="sale",
+                category="delivery",
                 amount=new_total,
                 delivery_id=delivery_id,
             )
+
+        # 更新 delivery.total_amount
+        delivery.total_amount = new_total
 
         self.db.commit()
         return {"return_total": return_total, "new_total": new_total}
