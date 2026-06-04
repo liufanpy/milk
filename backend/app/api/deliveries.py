@@ -18,7 +18,10 @@ def get_delivery_service(db: Session = Depends(get_db)):
 
 @router.post("", status_code=201)
 def create_delivery(data: DeliveryCreate, svc: DeliveryService = Depends(get_delivery_service)):
-    return svc.create_delivery(data)
+    try:
+        return svc.create_delivery(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("")
