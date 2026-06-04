@@ -58,16 +58,20 @@ export default function DeliveriesPage() {
     if (!customerId || items.some(i => !i.product_id || !i.shelf_id || !i.quantity)) {
       alert('请填写完整信息'); return;
     }
-    await createMutation.mutateAsync({
-      customer_id: Number(customerId),
-      delivery_date: deliveryDate,
-      items,
-      paid,
-      note,
-    });
-    alert('送货单创建成功');
-    setCustomerId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]); setNote('');
-    refetch();
+    try {
+      await createMutation.mutateAsync({
+        customer_id: Number(customerId),
+        delivery_date: deliveryDate,
+        items,
+        paid,
+        note,
+      });
+      alert('送货单创建成功');
+      setCustomerId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]); setNote('');
+      refetch();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '创建失败');
+    }
   };
 
   const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
@@ -91,17 +95,21 @@ export default function DeliveriesPage() {
 
   const handleExchange = async () => {
     if (!selectedDelivery) return;
-    await exchangeMutation.mutateAsync({
-      id: selectedDelivery.id,
-      data: { return_items: returnItems, new_items: newItems },
-    });
-    alert('换货成功');
-    setExchangeOpen(false);
-    setReturnItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
-    setNewItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
-    const detail = await deliveryApi.get(selectedDelivery.id);
-    setSelectedDelivery(detail);
-    refetch();
+    try {
+      await exchangeMutation.mutateAsync({
+        id: selectedDelivery.id,
+        data: { return_items: returnItems, new_items: newItems },
+      });
+      alert('换货成功');
+      setExchangeOpen(false);
+      setReturnItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+      setNewItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+      const detail = await deliveryApi.get(selectedDelivery.id);
+      setSelectedDelivery(detail);
+      refetch();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '换货失败');
+    }
   };
 
   // Filter deliveries
