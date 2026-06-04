@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier } from '../hooks/useSuppliers';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Table } from '../components/ui/Table';
+import CsvImportModal from '../components/business/CsvImportModal';
+import { supplierApi } from '../services/api';
 import type { Supplier } from '../types';
 
 const defaultForm = { name: '', contact: '', phone: '' };
@@ -13,6 +16,9 @@ export default function SuppliersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState(defaultForm);
+
+  const qc = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: suppliers = [], isLoading } = useSuppliers(keyword);
   const createMutation = useCreateSupplier();
@@ -58,7 +64,11 @@ export default function SuppliersPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">供应商管理</h2>
-        <Button onClick={openCreate}>+ 新增供应商</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button variant="secondary" onClick={() => window.open('/api/suppliers/export')}>导出 CSV</Button>
+          <Button onClick={openCreate}>+ 新增供应商</Button>
+        </div>
       </div>
       <Input placeholder="搜索供应商..." value={keyword} onChange={(e) => setKeyword(e.target.value)} className="mb-4 max-w-sm" />
       {isLoading ? <p className="text-gray-400">加载中...</p> : <Table columns={columns} data={suppliers} rowKey={(s) => s.id} />}
@@ -73,6 +83,15 @@ export default function SuppliersPage() {
           </div>
         </div>
       </Modal>
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入供应商"
+        onImport={(file) => supplierApi.importFile(file)}
+        onConfirm={(rows) => supplierApi.confirmImport(rows)}
+        onDone={() => qc.invalidateQueries({ queryKey: ['suppliers'] })}
+      />
     </div>
   );
 }

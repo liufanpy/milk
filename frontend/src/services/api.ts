@@ -42,6 +42,8 @@ export const supplierApi = {
   create: (data: any) => api.post('/suppliers', data).then(r => r.data),
   update: (id: number, data: any) => api.put(`/suppliers/${id}`, data).then(r => r.data),
   delete: (id: number) => api.delete(`/suppliers/${id}`),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/suppliers/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/suppliers/import/confirm', { rows }).then(r => r.data),
 };
 
 // Shelves
@@ -50,6 +52,8 @@ export const shelfApi = {
   create: (data: any) => api.post('/shelves', data).then(r => r.data),
   update: (id: number, data: any) => api.put(`/shelves/${id}`, data).then(r => r.data),
   delete: (id: number) => api.delete(`/shelves/${id}`),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/shelves/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/shelves/import/confirm', { rows }).then(r => r.data),
 };
 
 // Purchases

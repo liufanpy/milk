@@ -1,9 +1,12 @@
+import io
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.database import get_db
 from app.services.delivery_service import DeliveryService
 from app.schemas.delivery import DeliveryCreate, ExchangeCreate
+from app.models.delivery import Delivery
 
 router = APIRouter(prefix="/api/deliveries", tags=["deliveries"])
 
@@ -24,6 +27,17 @@ def list_deliveries(
     svc: DeliveryService = Depends(get_delivery_service),
 ):
     return svc.delivery_repo.list_all(customer_id, status)
+
+
+@router.get("/export")
+def export_deliveries(db: Session = Depends(get_db)):
+    rows = db.query(Delivery).order_by(Delivery.delivery_date.desc()).all()
+    csv_lines = ["ID,客户ID,日期,状态,备注"]
+    for r in rows:
+        csv_lines.append(f"{r.id},{r.customer_id},{r.delivery_date},{r.status},{r.note or ''}")
+    csv_content = "\n".join(csv_lines)
+    return StreamingResponse(io.BytesIO(csv_content.encode("utf-8-sig")), media_type="text/csv",
+                             headers={"Content-Disposition": "attachment; filename=deliveries.csv"})
 
 
 @router.get("/{delivery_id}")

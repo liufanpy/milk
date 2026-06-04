@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useShelves, useCreateShelf, useUpdateShelf, useDeleteShelf } from '../hooks/useShelves';
 import { useCustomers } from '../hooks/useCustomers';
 import { Button } from '../components/ui/Button';
@@ -6,12 +7,17 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 import { Table } from '../components/ui/Table';
+import CsvImportModal from '../components/business/CsvImportModal';
+import { shelfApi } from '../services/api';
 import type { Shelf } from '../types';
 
 export default function ShelvesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Shelf | null>(null);
   const [form, setForm] = useState<{ name: string; customer_id: number | '' }>({ name: '', customer_id: '' });
+
+  const qc = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: shelves = [], isLoading } = useShelves();
   const { data: customers = [] } = useCustomers();
@@ -67,7 +73,11 @@ export default function ShelvesPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">货架管理</h2>
-        <Button onClick={openCreate}>+ 新增货架</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button variant="secondary" onClick={() => window.open('/api/shelves/export')}>导出 CSV</Button>
+          <Button onClick={openCreate}>+ 新增货架</Button>
+        </div>
       </div>
       {isLoading ? <p className="text-gray-400">加载中...</p> : <Table columns={columns} data={shelves} rowKey={(s) => s.id} />}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? '编辑货架' : '新增货架'}>
@@ -85,6 +95,15 @@ export default function ShelvesPage() {
           </div>
         </div>
       </Modal>
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入货架"
+        onImport={(file) => shelfApi.importFile(file)}
+        onConfirm={(rows) => shelfApi.confirmImport(rows)}
+        onDone={() => qc.invalidateQueries({ queryKey: ['shelves'] })}
+      />
     </div>
   );
 }

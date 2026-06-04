@@ -49,7 +49,7 @@ export default function PurchasesPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">进货管理</h2>
+      <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">进货管理</h2><Button variant="secondary" size="sm" onClick={() => window.open('/api/purchases/export')}>导出 CSV</Button></div>
       <div className="bg-white rounded-lg border p-4 mb-6 space-y-3">
         <div>
           <label className="text-sm font-medium text-gray-700">供应商</label>

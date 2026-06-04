@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { dashboardApi } from '../services/api';
+import { Button } from '../components/ui/Button';
 
 export default function InventoryPage() {
   const { data: inventory = [], isLoading } = useQuery({ queryKey: ['inventory'], queryFn: dashboardApi.getInventory });
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">库存总览</h2>
+      <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">库存总览</h2><Button variant="secondary" size="sm" onClick={() => window.open('/api/inventory/export')}>导出 CSV</Button></div>
       <div className="bg-white rounded-lg border overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="border-b bg-gray-50 text-left text-gray-600">
