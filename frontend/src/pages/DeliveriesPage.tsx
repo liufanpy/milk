@@ -6,7 +6,7 @@ import { Badge } from '../components/ui/Badge';
 import { ProductSelect } from '../components/business/ProductSelect';
 import { CustomerSelect } from '../components/business/CustomerSelect';
 import { useDeliveries, useCreateDelivery, useSettleDelivery, useExchangeDelivery } from '../hooks/useDeliveries';
-import { deliveryApi, shelfApi, customerApi } from '../services/api';
+import { deliveryApi, shelfApi, customerApi, productApi } from '../services/api';
 
 interface DeliveryItem {
   product_id: number;
@@ -24,6 +24,7 @@ export default function DeliveriesPage() {
   const [note, setNote] = useState('');
   const [shelves, setShelves] = useState<any[]>([]);
   const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
+  const [productNames, setProductNames] = useState<Record<number, string>>({});
 
   // List state
   const [filterCustomer, setFilterCustomer] = useState<string | number>('');
@@ -45,6 +46,7 @@ export default function DeliveriesPage() {
   useEffect(() => {
     shelfApi.list().then(setShelves);
     customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
+    productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
   }, []);
 
   // Create helpers
@@ -199,7 +201,7 @@ export default function DeliveriesPage() {
             <div>
               <h4 className="text-sm font-medium mb-1">品项</h4>
               {selectedDelivery.items?.map((item: any, i: number) => (
-                <div key={i} className="text-sm text-gray-600 border-b py-1">产品#{item.product_id} — {item.direction} {item.reason} — qty: {item.quantity}</div>
+                <div key={i} className="text-sm text-gray-600 border-b py-1">{productNames[item.product_id] || `产品#${item.product_id}`} — qty: {item.quantity}</div>
               ))}
             </div>
             <div>
