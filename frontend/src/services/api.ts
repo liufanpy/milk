@@ -60,6 +60,9 @@ export const shelfApi = {
 export const purchaseApi = {
   create: (data: any) => api.post('/purchases', data).then(r => r.data),
   list: () => api.get('/purchases').then(r => r.data),
+  get: (id: number) => api.get(`/purchases/${id}`).then(r => r.data),
+  confirm: (id: number, items?: any[]) => api.post(`/purchases/${id}/confirm`, { items }).then(r => r.data),
+  cancel: (id: number) => api.post(`/purchases/${id}/cancel`).then(r => r.data),
   importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/purchases/import', fd).then(r => r.data); },
   confirmImport: (rows: any[]) => api.post('/purchases/import/confirm', { rows }).then(r => r.data),
 };
