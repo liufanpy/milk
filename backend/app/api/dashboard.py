@@ -26,7 +26,7 @@ def get_dashboard(db: Session = Depends(get_db)):
     today = date.today()
 
     today_sales = db.query(func.sum(Transaction.amount)).filter(
-        Transaction.category == "sale",
+        Transaction.category.in_(["sale", "delivery", "delivery_cancel"]),
         func.date(Transaction.created_at) == today,
     ).scalar() or 0.0
 
