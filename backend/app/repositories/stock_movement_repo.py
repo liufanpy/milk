@@ -19,6 +19,11 @@ class StockMovementRepository:
             StockMovement.delivery_id == delivery_id
         ).all()
 
+    def get_by_purchase_order(self, purchase_order_id: int) -> List[StockMovement]:
+        return self.db.query(StockMovement).filter(
+            StockMovement.purchase_order_id == purchase_order_id
+        ).all()
+
     def get_inventory(self) -> list:
         return (
             self.db.query(
