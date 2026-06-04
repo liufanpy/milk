@@ -22,6 +22,7 @@ const paymentOptions = [
   { value: '现结', label: '现结' },
   { value: '周结', label: '周结' },
   { value: '月结', label: '月结' },
+  { value: '预存款', label: '预存款' },
   { value: '不定期', label: '不定期' },
 ];
 const defaultForm: CreateCustomerData = { name: '', phone: '', contact: '', address: '', price_tier: '批发', default_payment: '现结' };
