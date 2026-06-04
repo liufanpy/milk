@@ -67,8 +67,11 @@ class DeliveryService:
         movements = self.stock_repo.get_by_delivery(delivery_id)
         transactions = self.txn_repo.get_by_delivery(delivery_id)
 
-        sale_total = sum(t.amount for t in transactions if t.category == "sale")
+        delivery_total = sum(t.amount for t in transactions if t.category == "delivery")
+        delivery_cancel_total = sum(t.amount for t in transactions if t.category == "delivery_cancel")
         paid_total = sum(t.amount for t in transactions if t.category == "payment")
+
+        net = delivery_total + delivery_cancel_total
 
         return {
             "id": delivery.id,
@@ -77,9 +80,9 @@ class DeliveryService:
             "status": delivery.status,
             "note": delivery.note,
             "items": [{"product_id": m.product_id, "quantity": m.quantity, "reason": m.reason, "direction": m.direction} for m in movements],
-            "total_amount": sale_total,
+            "total_amount": net,
             "paid_amount": paid_total,
-            "unpaid_amount": sale_total - paid_total,
+            "unpaid_amount": net - paid_total,
             "transactions": [{"id": t.id, "category": t.category, "amount": t.amount, "created_at": str(t.created_at)} for t in transactions],
         }
 
