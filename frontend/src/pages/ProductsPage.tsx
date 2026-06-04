@@ -14,7 +14,7 @@ export default function ProductsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<CreateProductData>({
-    name: '', brand: '', category: '', unit: '箱', spec: '', default_retail_price: 0, default_wholesale_price: 0, shelf_life_days: 0,
+    name: '', brand: '', category: '', unit: '箱', spec: '', default_purchase_price: 0, default_retail_price: 0, default_wholesale_price: 0, shelf_life_days: 0,
   });
 
   const qc = useQueryClient();
@@ -27,13 +27,14 @@ export default function ProductsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', brand: '', category: '', unit: '箱', spec: '', default_retail_price: 0, default_wholesale_price: 0, shelf_life_days: 0 });
+    setForm({ name: '', brand: '', category: '', unit: '箱', spec: '', default_purchase_price: 0, default_retail_price: 0, default_wholesale_price: 0, shelf_life_days: 0 });
     setModalOpen(true);
   };
   const openEdit = (p: Product) => {
     setEditing(p);
     setForm({
       name: p.name, brand: p.brand, category: p.category, unit: p.unit, spec: p.spec,
+      default_purchase_price: p.default_purchase_price,
       default_retail_price: p.default_retail_price, default_wholesale_price: p.default_wholesale_price, shelf_life_days: p.shelf_life_days,
     });
     setModalOpen(true);
@@ -53,6 +54,7 @@ export default function ProductsPage() {
     { key: 'brand', title: '品牌' },
     { key: 'category', title: '分类' },
     { key: 'spec', title: '规格' },
+    { key: 'default_purchase_price', title: '默认进货价', render: (p: Product) => `¥${p.default_purchase_price ?? 0}` },
     { key: 'unit', title: '单位' },
     { key: 'default_retail_price', title: '零售默认价', render: (p: Product) => `¥${p.default_retail_price}` },
     { key: 'default_wholesale_price', title: '批发默认价', render: (p: Product) => `¥${p.default_wholesale_price}` },
@@ -86,6 +88,7 @@ export default function ProductsPage() {
           <Input label="分类" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
           <Input label="规格" value={form.spec || ''} onChange={(e) => setForm({ ...form, spec: e.target.value })} />
           <Input label="单位" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+          <Input label="默认进货价" type="number" value={String(form.default_purchase_price ?? 0)} onChange={(e) => setForm({ ...form, default_purchase_price: Number(e.target.value) })} />
           <Input label="零售默认价" type="number" value={String(form.default_retail_price)} onChange={(e) => setForm({ ...form, default_retail_price: Number(e.target.value) })} />
           <Input label="批发默认价" type="number" value={String(form.default_wholesale_price)} onChange={(e) => setForm({ ...form, default_wholesale_price: Number(e.target.value) })} />
           <Input label="保质期(天)" type="number" value={String(form.shelf_life_days)} onChange={(e) => setForm({ ...form, shelf_life_days: Number(e.target.value) })} />
