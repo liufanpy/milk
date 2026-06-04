@@ -23,10 +23,9 @@ class TransactionRepository:
         result = self.db.query(
             func.sum(
                 case(
-                    (Transaction.category == "sale", Transaction.amount),
+                    (Transaction.category.in_(["delivery", "delivery_cancel"]), Transaction.amount),
                     (Transaction.category == "payment", -Transaction.amount),
                     (Transaction.category == "subscription", -Transaction.amount),
-                    (Transaction.category == "refund", -Transaction.amount),
                     else_=0,
                 )
             )
@@ -34,32 +33,20 @@ class TransactionRepository:
         return result or 0.0
 
     def get_receivables(self) -> list:
+        case_expr = case(
+            (Transaction.category.in_(["delivery", "delivery_cancel"]), Transaction.amount),
+            (Transaction.category == "payment", -Transaction.amount),
+            (Transaction.category == "subscription", -Transaction.amount),
+            else_=0,
+        )
         return (
             self.db.query(
                 Transaction.customer_id,
-                func.sum(
-                    case(
-                        (Transaction.category == "sale", Transaction.amount),
-                        (Transaction.category == "payment", -Transaction.amount),
-                        (Transaction.category == "subscription", -Transaction.amount),
-                        (Transaction.category == "refund", -Transaction.amount),
-                        else_=0,
-                    )
-                ).label("ar_balance"),
+                func.sum(case_expr).label("ar_balance"),
             )
             .filter(Transaction.customer_id.isnot(None))
             .group_by(Transaction.customer_id)
-            .having(
-                func.sum(
-                    case(
-                        (Transaction.category == "sale", Transaction.amount),
-                        (Transaction.category == "payment", -Transaction.amount),
-                        (Transaction.category == "subscription", -Transaction.amount),
-                        (Transaction.category == "refund", -Transaction.amount),
-                        else_=0,
-                    )
-                ) != 0
-            )
+            .having(func.sum(case_expr) != 0)
             .all()
         )
 
