@@ -65,7 +65,11 @@ class PurchaseService:
             raise ValueError("仅草稿状态可确认")
 
         if items:
-            total = sum(it["quantity"] * it["unit_cost"] for it in items)
+            total = sum(
+                (it["quantity"] if isinstance(it, dict) else it.quantity) *
+                (it["unit_cost"] if isinstance(it, dict) else it.unit_cost)
+                for it in items
+            )
             order.total_amount = total
         else:
             items = []
