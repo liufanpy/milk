@@ -1,5 +1,5 @@
 import io
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -39,3 +39,14 @@ def export_purchases(db: Session = Depends(get_db)):
     csv_content = "\n".join(csv_lines)
     return StreamingResponse(io.BytesIO(csv_content.encode("utf-8-sig")), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=purchases.csv"})
+
+
+@router.post("/import")
+async def import_purchases(file: UploadFile = File(...), svc: PurchaseService = Depends(get_purchase_service)):
+    content = await file.read()
+    return svc.import_preview(content)
+
+
+@router.post("/import/confirm")
+def confirm_import(data: dict, svc: PurchaseService = Depends(get_purchase_service)):
+    return svc.import_confirm(data.get("rows", []))

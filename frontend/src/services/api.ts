@@ -60,6 +60,8 @@ export const shelfApi = {
 export const purchaseApi = {
   create: (data: any) => api.post('/purchases', data).then(r => r.data),
   list: () => api.get('/purchases').then(r => r.data),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/purchases/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/purchases/import/confirm', { rows }).then(r => r.data),
 };
 
 // Sales

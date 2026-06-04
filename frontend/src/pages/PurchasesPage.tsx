@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ProductSelect } from '../components/business/ProductSelect';
+import CsvImportModal from '../components/business/CsvImportModal';
 import { purchaseApi, supplierApi, shelfApi } from '../services/api';
 
 interface ItemRow {
@@ -12,6 +13,7 @@ interface ItemRow {
 }
 
 export default function PurchasesPage() {
+  const [importOpen, setImportOpen] = useState(false);
   const [supplierId, setSupplierId] = useState<number | string>('');
   const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_cost: 0, shelf_id: 0 }]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -49,7 +51,11 @@ export default function PurchasesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">进货管理</h2><Button variant="secondary" size="sm" onClick={() => window.open('/api/purchases/export')}>导出 CSV</Button></div>
+      <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">进货管理</h2>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button variant="secondary" size="sm" onClick={() => window.open('/api/purchases/export')}>导出 CSV</Button>
+        </div></div>
       <div className="bg-white rounded-lg border p-4 mb-6 space-y-3">
         <div>
           <label className="text-sm font-medium text-gray-700">供应商</label>
@@ -98,6 +104,15 @@ export default function PurchasesPage() {
           </div>
         ))}
       </div>
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入进货"
+        onImport={(file) => purchaseApi.importFile(file)}
+        onConfirm={(rows) => purchaseApi.confirmImport(rows)}
+        onDone={() => { purchaseApi.list().then((data: any) => setPurchases(data)); }}
+      />
     </div>
   );
 }
