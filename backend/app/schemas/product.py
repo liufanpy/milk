@@ -8,6 +8,7 @@ class ProductCreate(BaseModel):
     category: str = ""
     unit: str = "箱"
     barcode: str = ""
+    spec: str = ""
     default_retail_price: float = 0.0
     default_wholesale_price: float = 0.0
     shelf_life_days: int = 0
@@ -19,6 +20,7 @@ class ProductUpdate(BaseModel):
     category: Optional[str] = None
     unit: Optional[str] = None
     barcode: Optional[str] = None
+    spec: Optional[str] = None
     default_retail_price: Optional[float] = None
     default_wholesale_price: Optional[float] = None
     shelf_life_days: Optional[int] = None
@@ -31,6 +33,7 @@ class ProductOut(BaseModel):
     category: str
     unit: str
     barcode: str
+    spec: str
     default_retail_price: float
     default_wholesale_price: float
     shelf_life_days: int

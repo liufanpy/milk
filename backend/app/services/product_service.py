@@ -5,7 +5,7 @@ from app.services.csv_importer import parse_csv
 
 PRODUCT_HEADERS = [
     "name", "名称", "brand", "品牌", "category", "分类",
-    "unit", "单位", "barcode", "条码",
+    "unit", "单位", "barcode", "条码", "spec", "规格",
     "default_retail_price", "零售默认价",
     "default_wholesale_price", "批发默认价",
     "shelf_life_days", "保质期天",
@@ -37,11 +37,11 @@ class ProductService:
 
     def export_csv(self) -> str:
         products = self.repo.get_all(limit=10000)
-        headers = ["名称", "品牌", "分类", "单位", "条码", "零售默认价", "批发默认价", "保质期天"]
+        headers = ["名称", "品牌", "分类", "单位", "条码", "规格", "零售默认价", "批发默认价", "保质期天"]
         lines = [",".join(headers)]
         for p in products:
             lines.append(",".join([
-                p.name, p.brand, p.category, p.unit, p.barcode,
+                p.name, p.brand, p.category, p.unit, p.barcode, p.spec,
                 str(p.default_retail_price), str(p.default_wholesale_price), str(p.shelf_life_days),
             ]))
         return "\n".join(lines)
@@ -85,6 +85,7 @@ class ProductService:
                     category=(data.get("category") or data.get("分类") or "").strip(),
                     unit=(data.get("unit") or data.get("单位") or "箱").strip(),
                     barcode=(data.get("barcode") or data.get("条码") or "").strip(),
+                    spec=(data.get("spec") or data.get("规格") or "").strip(),
                     default_retail_price=float(data.get("default_retail_price") or data.get("零售默认价") or 0),
                     default_wholesale_price=float(data.get("default_wholesale_price") or data.get("批发默认价") or 0),
                     shelf_life_days=int(float(data.get("shelf_life_days") or data.get("保质期天") or 0)),

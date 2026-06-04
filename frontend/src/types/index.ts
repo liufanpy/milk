@@ -5,6 +5,7 @@ export interface Product {
   category: string;
   unit: string;
   barcode: string;
+  spec: string;
   default_retail_price: number;
   default_wholesale_price: number;
   shelf_life_days: number;
@@ -89,6 +90,7 @@ export interface CreateProductData {
   brand?: string;
   category?: string;
   unit?: string;
+  spec?: string;
   default_retail_price?: number;
   default_wholesale_price?: number;
   shelf_life_days?: number;

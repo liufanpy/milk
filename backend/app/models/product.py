@@ -11,6 +11,7 @@ class Product(Base):
     category = Column(String(50), default="")
     unit = Column(String(20), default="箱")
     barcode = Column(String(100), default="")
+    spec = Column(String(100), default="")
     default_retail_price = Column(Float, default=0.0)
     default_wholesale_price = Column(Float, default=0.0)
     shelf_life_days = Column(Integer, default=0)
