@@ -1,6 +1,6 @@
 from typing import List
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 from app.models.transaction import Transaction
 
 
@@ -22,7 +22,7 @@ class TransactionRepository:
     def get_ar_by_customer(self, customer_id: int) -> float:
         result = self.db.query(
             func.sum(
-                func.case(
+                case(
                     (Transaction.category == "sale", Transaction.amount),
                     (Transaction.category == "payment", -Transaction.amount),
                     (Transaction.category == "subscription", -Transaction.amount),
@@ -38,7 +38,7 @@ class TransactionRepository:
             self.db.query(
                 Transaction.customer_id,
                 func.sum(
-                    func.case(
+                    case(
                         (Transaction.category == "sale", Transaction.amount),
                         (Transaction.category == "payment", -Transaction.amount),
                         (Transaction.category == "subscription", -Transaction.amount),
@@ -51,7 +51,7 @@ class TransactionRepository:
             .group_by(Transaction.customer_id)
             .having(
                 func.sum(
-                    func.case(
+                    case(
                         (Transaction.category == "sale", Transaction.amount),
                         (Transaction.category == "payment", -Transaction.amount),
                         (Transaction.category == "subscription", -Transaction.amount),
