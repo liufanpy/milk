@@ -6,6 +6,7 @@ from app.database import get_db
 from app.services.sale_service import SaleService
 from app.schemas.sale import SaleCreate
 from app.models.transaction import Transaction
+from app.models.customer import Customer
 
 router = APIRouter(prefix="/api/sales", tags=["sales"])
 
@@ -27,9 +28,11 @@ def list_sales(svc: SaleService = Depends(get_sale_service)):
 @router.get("/export")
 def export_sales(db: Session = Depends(get_db)):
     rows = db.query(Transaction).filter(Transaction.category == "sale").order_by(Transaction.created_at.desc()).all()
-    csv_lines = ["ID,客户ID,金额,送货单ID,时间"]
+    customers = {c.id: c.name for c in db.query(Customer).all()}
+    csv_lines = ["客户名称,金额,时间"]
     for r in rows:
-        csv_lines.append(f"{r.id},{r.customer_id or ''},{r.amount},{r.delivery_id or ''},{r.created_at}")
+        cname = customers.get(r.customer_id, "散客") if r.customer_id else "散客"
+        csv_lines.append(f"{cname},{r.amount},{r.created_at}")
     csv_content = "\n".join(csv_lines)
     return StreamingResponse(io.BytesIO(csv_content.encode("utf-8-sig")), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=sales.csv"})
