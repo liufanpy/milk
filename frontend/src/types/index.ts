@@ -128,3 +128,28 @@ export interface DeliveryCreateItem {
   unit_price: number;
   shelf_id: number;
 }
+
+export interface PurchaseOrder {
+  id: number;
+  order_number: string;
+  supplier_id: number;
+  supplier_name: string;
+  purchase_date: string;
+  total_amount: number;
+  status: string;
+  note: string;
+  created_at: string;
+}
+
+export interface PurchaseOrderDetail extends PurchaseOrder {
+  items: PurchaseOrderDetailItem[];
+}
+
+export interface PurchaseOrderDetailItem {
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  unit_cost: number;
+  shelf_id: number;
+  shelf_name: string;
+}
