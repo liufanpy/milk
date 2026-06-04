@@ -45,20 +45,23 @@ class PurchaseService:
     def list_purchases(self):
         return self.stock_repo.list_all()
 
+    DFLT_SUPPLIER = "金健牛奶"
+    DFLT_SHELF = "小欢的牛奶店"
+
     def _name_maps(self):
-        products = {p.name: p.id for p in self.db.query(Product).all()}
+        prods = {p.name: (p.id, p.default_purchase_price) for p in self.db.query(Product).all()}
         shelves = {s.name: s.id for s in self.db.query(Shelf).all()}
         suppliers = {s.name: s.id for s in self.db.query(Supplier).all()}
-        return products, shelves, suppliers
+        return prods, shelves, suppliers
 
     def import_preview(self, file_content: bytes) -> dict:
-        products, shelves, suppliers = self._name_maps()
+        prods, shelves, suppliers = self._name_maps()
 
         def validate(row: dict) -> str | bool:
             pname = (row.get("产品名称") or row.get("product_name") or "").strip()
             if not pname:
                 return "产品名称为空"
-            if pname not in products:
+            if pname not in prods:
                 return f"产品'{pname}'不存在"
             qty = row.get("数量") or row.get("quantity") or "0"
             try:
@@ -66,12 +69,10 @@ class PurchaseService:
                     return "数量必须大于0"
             except ValueError:
                 return "数量格式错误"
-            sname = (row.get("货架名称") or row.get("shelf_name") or "").strip()
-            if sname and sname not in shelves:
+            sname = (row.get("货架名称") or row.get("shelf_name") or "").strip() or self.DFLT_SHELF
+            if sname not in shelves:
                 return f"货架'{sname}'不存在"
-            supname = (row.get("供应商名称") or row.get("supplier_name") or "").strip()
-            if not supname:
-                return "供应商名称为空"
+            supname = (row.get("供应商名称") or row.get("supplier_name") or "").strip() or self.DFLT_SUPPLIER
             if supname not in suppliers:
                 return f"供应商'{supname}'不存在"
             return True
@@ -79,15 +80,14 @@ class PurchaseService:
         return parse_csv(file_content, validate, PURCHASE_HEADERS)
 
     def import_confirm(self, rows: list[dict]) -> dict:
-        products, shelves, suppliers = self._name_maps()
+        prods, shelves, suppliers = self._name_maps()
         success = 0
         errors: list[dict] = []
 
-        # 按供应商分组
         groups: dict[str, list[dict]] = {}
         for row in rows:
             data = row.get("data", row)
-            supname = (data.get("供应商名称") or data.get("supplier_name") or "").strip()
+            supname = (data.get("供应商名称") or data.get("supplier_name") or "").strip() or self.DFLT_SUPPLIER
             if supname not in groups:
                 groups[supname] = []
             groups[supname].append(data)
@@ -103,25 +103,24 @@ class PurchaseService:
             movements = []
             for data in items:
                 pname = (data.get("产品名称") or data.get("product_name") or "").strip()
-                pid = products.get(pname)
-                if not pid:
+                p = prods.get(pname)
+                if not p:
                     errors.append({"row": data.get("index", "?"), "msg": f"产品'{pname}'不存在"})
                     continue
-                sname = (data.get("货架名称") or data.get("shelf_name") or "").strip()
-                shelf_id = shelves.get(sname) if sname else None
+                pid, default_cost = p
+                sname = (data.get("货架名称") or data.get("shelf_name") or "").strip() or self.DFLT_SHELF
+                shelf_id = shelves.get(sname)
                 if not shelf_id:
                     errors.append({"row": data.get("index", "?"), "msg": f"货架'{sname}'不存在"})
                     continue
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
-                cost = float(data.get("进价") or data.get("unit_cost") or 0)
+                cost = data.get("进价") or data.get("unit_cost") or ""
+                cost = float(cost) if cost else default_cost
                 total += qty * cost
                 movements.append({
-                    "product_id": pid,
-                    "shelf_id": shelf_id,
-                    "direction": "in",
-                    "reason": "purchase",
-                    "quantity": qty,
-                    "unit_cost": cost,
+                    "product_id": pid, "shelf_id": shelf_id,
+                    "direction": "in", "reason": "purchase",
+                    "quantity": qty, "unit_cost": cost,
                 })
 
             if movements:
