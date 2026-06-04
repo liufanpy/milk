@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy.orm import Session
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
@@ -7,7 +8,7 @@ from app.models.product import Product
 from app.models.shelf import Shelf
 from app.models.supplier import Supplier
 
-PURCHASE_HEADERS = ["产品名称", "product_name", "数量", "quantity", "进价", "unit_cost", "货架名称", "shelf_name", "供应商名称", "supplier_name"]
+PURCHASE_HEADERS = ["产品名称", "product_name", "数量", "quantity", "进价", "unit_cost", "货架名称", "shelf_name", "供应商名称", "supplier_name", "日期", "date"]
 
 
 class PurchaseService:
@@ -116,11 +117,20 @@ class PurchaseService:
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
                 cost = data.get("进价") or data.get("unit_cost") or ""
                 cost = float(cost) if cost else default_cost
+                date_str = (data.get("日期") or data.get("date") or "").strip()
+                if date_str:
+                    try:
+                        created_at = datetime.strptime(date_str, "%Y-%m-%d")
+                    except ValueError:
+                        created_at = datetime.utcnow()
+                else:
+                    created_at = datetime.utcnow()
                 total += qty * cost
                 movements.append({
                     "product_id": pid, "shelf_id": shelf_id,
                     "direction": "in", "reason": "purchase",
                     "quantity": qty, "unit_cost": cost,
+                    "created_at": created_at,
                 })
 
             if movements:

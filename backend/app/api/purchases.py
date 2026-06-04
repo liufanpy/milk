@@ -31,11 +31,12 @@ def export_purchases(db: Session = Depends(get_db)):
     rows = db.query(StockMovement).filter(StockMovement.reason == "purchase").order_by(StockMovement.created_at.desc()).all()
     products = {p.id: p.name for p in db.query(Product).all()}
     shelves = {s.id: s.name for s in db.query(Shelf).all()}
-    csv_lines = ["产品名称,货架名称,数量,进价,时间"]
+    csv_lines = ["产品名称,货架名称,数量,进价,日期"]
     for r in rows:
         pname = products.get(r.product_id, str(r.product_id))
         sname = shelves.get(r.shelf_id, str(r.shelf_id))
-        csv_lines.append(f"{pname},{sname},{r.quantity},{r.unit_cost},{r.created_at}")
+        date_str = str(r.created_at)[:10] if r.created_at else ""
+        csv_lines.append(f"{pname},{sname},{r.quantity},{r.unit_cost},{date_str}")
     csv_content = "\n".join(csv_lines)
     return StreamingResponse(io.BytesIO(csv_content.encode("utf-8-sig")), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=purchases.csv"})
