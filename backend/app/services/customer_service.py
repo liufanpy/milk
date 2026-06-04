@@ -5,7 +5,7 @@ from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.services.csv_importer import parse_csv
 
 CUSTOMER_HEADERS = [
-    "name", "名称", "phone", "电话", "address", "地址",
+    "name", "名称", "phone", "电话", "contact", "联系人", "address", "地址",
     "price_tier", "价格档位", "default_payment", "默认结账",
 ]
 
@@ -42,10 +42,10 @@ class CustomerService:
 
     def export_csv(self) -> str:
         customers = self.repo.get_all(limit=10000)
-        headers = ["名称", "电话", "地址", "价格档位", "默认结账"]
+        headers = ["名称", "电话", "联系人", "地址", "价格档位", "默认结账"]
         lines = [",".join(headers)]
         for c in customers:
-            lines.append(",".join([c.name, c.phone, c.address, c.price_tier, c.default_payment]))
+            lines.append(",".join([c.name, c.phone, c.contact, c.address, c.price_tier, c.default_payment]))
         return "\n".join(lines)
 
     def import_preview(self, file_content: bytes) -> dict:
@@ -75,9 +75,10 @@ class CustomerService:
                 self.repo.create(
                     name=name,
                     phone=(data.get("phone") or data.get("电话") or "").strip(),
+                    contact=(data.get("contact") or data.get("联系人") or "").strip(),
                     address=(data.get("address") or data.get("地址") or "").strip(),
                     price_tier=(data.get("price_tier") or data.get("价格档位") or "retail").strip(),
-                    default_payment=(data.get("default_payment") or data.get("默认结账") or "immediate").strip(),
+                    default_payment=(data.get("default_payment") or data.get("默认结账") or "现结").strip(),
                 )
                 success += 1
             except Exception as e:

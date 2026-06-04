@@ -24,7 +24,7 @@ const paymentOptions = [
   { value: '月结', label: '月结' },
   { value: '不定期', label: '不定期' },
 ];
-const defaultForm: CreateCustomerData = { name: '', phone: '', address: '', price_tier: '批发', default_payment: '现结' };
+const defaultForm: CreateCustomerData = { name: '', phone: '', contact: '', address: '', price_tier: '批发', default_payment: '现结' };
 
 export default function CustomersPage() {
   const qc = useQueryClient();
@@ -54,7 +54,7 @@ export default function CustomersPage() {
   };
   const openEdit = (c: Customer) => {
     setEditing(c);
-    setForm({ name: c.name, phone: c.phone, address: c.address, price_tier: c.price_tier, default_payment: c.default_payment });
+    setForm({ name: c.name, phone: c.phone, contact: c.contact, address: c.address, price_tier: c.price_tier, default_payment: c.default_payment });
     setModalOpen(true);
   };
 
@@ -86,6 +86,7 @@ export default function CustomersPage() {
   const columns = [
     { key: 'name', title: '名称' },
     { key: 'phone', title: '电话' },
+    { key: 'contact', title: '联系人' },
     { key: 'address', title: '地址' },
     { key: 'price_tier', title: '价格等级' },
     { key: 'default_payment', title: '默认结算' },
@@ -123,6 +124,7 @@ export default function CustomersPage() {
         <div className="space-y-3">
           <Input label="名称" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <Input label="电话" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input label="联系人" value={form.contact || ''} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
           <Input label="地址" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <Select label="价格等级" options={priceTierOptions} value={form.price_tier} onChange={(e) => setForm({ ...form, price_tier: e.target.value })} />
           <Select label="默认结算" options={paymentOptions} value={form.default_payment} onChange={(e) => setForm({ ...form, default_payment: e.target.value })} />

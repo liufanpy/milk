@@ -16,6 +16,7 @@ export interface Customer {
   id: number;
   name: string;
   phone: string;
+  contact: string;
   address: string;
   price_tier: string;
   default_payment: string;
@@ -101,6 +102,7 @@ export interface CreateProductData {
 export interface CreateCustomerData {
   name: string;
   phone?: string;
+  contact?: string;
   address?: string;
   price_tier?: string;
   default_payment?: string;
