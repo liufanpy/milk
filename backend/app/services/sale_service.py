@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.schemas.sale import SaleCreate
+from app.models.transaction import Transaction
 
 
 class SaleService:
@@ -38,4 +39,6 @@ class SaleService:
         return {"total": total, "item_count": len(data.items)}
 
     def list_sales(self):
-        return self.txn_repo.list_all()
+        return self.db.query(Transaction).filter(
+            Transaction.category == "sale"
+        ).order_by(Transaction.created_at.desc()).all()
