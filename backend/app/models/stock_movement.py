@@ -15,4 +15,5 @@ class StockMovement(Base):
     unit_cost = Column(Float, default=0.0)
     delivery_id = Column(Integer, ForeignKey("deliveries.id"), nullable=True)
     subscription_order_id = Column(Integer, ForeignKey("subscription_orders.id"), nullable=True)
+    purchase_order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
