@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Table } from '../components/ui/Table';
+import CsvImportModal from '../components/business/CsvImportModal';
+import { productApi } from '../services/api';
 import type { Product, CreateProductData } from '../types';
 
 export default function ProductsPage() {
@@ -13,6 +16,9 @@ export default function ProductsPage() {
   const [form, setForm] = useState<CreateProductData>({
     name: '', brand: '', category: '', unit: '箱', default_retail_price: 0, default_wholesale_price: 0, shelf_life_days: 0,
   });
+
+  const qc = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: products = [], isLoading } = useProducts(keyword);
   const createMutation = useCreateProduct();
@@ -64,7 +70,10 @@ export default function ProductsPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">产品管理</h2>
-        <Button onClick={openCreate}>+ 新增产品</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button onClick={openCreate}>+ 新增产品</Button>
+        </div>
       </div>
       <Input placeholder="搜索产品..." value={keyword} onChange={(e) => setKeyword(e.target.value)} className="mb-4 max-w-sm" />
       {isLoading ? <p className="text-gray-400">加载中...</p> : <Table columns={columns} data={products} rowKey={(p) => p.id} />}
@@ -83,6 +92,15 @@ export default function ProductsPage() {
           </div>
         </div>
       </Modal>
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入产品"
+        onImport={(file) => productApi.importFile(file)}
+        onConfirm={(rows) => productApi.confirmImport(rows)}
+        onDone={() => qc.invalidateQueries({ queryKey: ['products'] })}
+      />
     </div>
   );
 }

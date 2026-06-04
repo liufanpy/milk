@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer,
   useCustomerPrices, useAddCustomerPrice, useDeleteCustomerPrice,
@@ -8,6 +9,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
+import CsvImportModal from '../components/business/CsvImportModal';
+import { customerApi } from '../services/api';
 import { Table } from '../components/ui/Table';
 import type { Customer, CreateCustomerData, ProductCustomerPrice } from '../types';
 
@@ -24,8 +27,10 @@ const paymentOptions = [
 const defaultForm: CreateCustomerData = { name: '', phone: '', address: '', price_tier: '批发', default_payment: '月结' };
 
 export default function CustomersPage() {
+  const qc = useQueryClient();
   const [keyword, setKeyword] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [form, setForm] = useState<CreateCustomerData>(defaultForm);
 
@@ -104,7 +109,10 @@ export default function CustomersPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">客户管理</h2>
-        <Button onClick={openCreate}>+ 新增客户</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button onClick={openCreate}>+ 新增客户</Button>
+        </div>
       </div>
       <Input placeholder="搜索客户..." value={keyword} onChange={(e) => setKeyword(e.target.value)} className="mb-4 max-w-sm" />
       {isLoading ? <p className="text-gray-400">加载中...</p> : <Table columns={columns} data={customers} rowKey={(c) => c.id} />}
@@ -156,6 +164,15 @@ export default function CustomersPage() {
           </div>
         </div>
       </Modal>
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入客户"
+        onImport={(file) => customerApi.importFile(file)}
+        onConfirm={(rows) => customerApi.confirmImport(rows)}
+        onDone={() => qc.invalidateQueries({ queryKey: ['customers'] })}
+      />
     </div>
   );
 }

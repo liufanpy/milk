@@ -9,6 +9,12 @@ export const productApi = {
   create: (data: any) => api.post('/products', data).then(r => r.data),
   update: (id: number, data: any) => api.put(`/products/${id}`, data).then(r => r.data),
   delete: (id: number) => api.delete(`/products/${id}`),
+  importFile: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post('/products/import', fd).then(r => r.data);
+  },
+  confirmImport: (rows: any[]) => api.post('/products/import/confirm', { rows }).then(r => r.data),
 };
 
 // Customers
@@ -22,6 +28,12 @@ export const customerApi = {
   addPrice: (customerId: number, productId: number, price: number) =>
     api.post(`/customers/${customerId}/prices?product_id=${productId}&price=${price}`).then(r => r.data),
   deletePrice: (customerId: number, priceId: number) => api.delete(`/customers/${customerId}/prices/${priceId}`),
+  importFile: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post('/customers/import', fd).then(r => r.data);
+  },
+  confirmImport: (rows: any[]) => api.post('/customers/import/confirm', { rows }).then(r => r.data),
 };
 
 // Suppliers
