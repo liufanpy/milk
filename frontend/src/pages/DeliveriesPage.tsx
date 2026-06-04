@@ -6,7 +6,7 @@ import { Badge } from '../components/ui/Badge';
 import { ProductSelect } from '../components/business/ProductSelect';
 import { CustomerSelect } from '../components/business/CustomerSelect';
 import { useDeliveries, useCreateDelivery, useSettleDelivery, useExchangeDelivery } from '../hooks/useDeliveries';
-import { deliveryApi, shelfApi } from '../services/api';
+import { deliveryApi, shelfApi, customerApi } from '../services/api';
 
 interface DeliveryItem {
   product_id: number;
@@ -23,6 +23,7 @@ export default function DeliveriesPage() {
   const [paid, setPaid] = useState(false);
   const [note, setNote] = useState('');
   const [shelves, setShelves] = useState<any[]>([]);
+  const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
 
   // List state
   const [filterCustomer, setFilterCustomer] = useState<string | number>('');
@@ -41,7 +42,10 @@ export default function DeliveriesPage() {
   const [returnItems, setReturnItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
   const [newItems, setNewItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
 
-  useEffect(() => { shelfApi.list().then(setShelves); }, []);
+  useEffect(() => {
+    shelfApi.list().then(setShelves);
+    customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
+  }, []);
 
   // Create helpers
   const updateItem = (idx: number, field: keyof DeliveryItem, value: number) =>
@@ -168,7 +172,7 @@ export default function DeliveriesPage() {
               {filtered.map((d: any) => (
                 <tr key={d.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(d)}>
                   <td className="px-4 py-2">#{d.id}</td>
-                  <td className="px-4 py-2">{d.customer_id}</td>
+                  <td className="px-4 py-2">{customerNames[d.customer_id] || `客户#${d.customer_id}`}</td>
                   <td className="px-4 py-2">{d.delivery_date || d.created_at?.slice(0, 10)}</td>
                   <td className="px-4 py-2"><Badge variant={d.status === 'delivered' ? 'success' : 'warning'}>{d.status}</Badge></td>
                   <td className="px-4 py-2">¥{d.total_amount || 0}</td>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ProductSelect } from '../components/business/ProductSelect';
-import { wastageApi, shelfApi } from '../services/api';
+import { wastageApi, shelfApi, productApi } from '../services/api';
 
 const REASONS = ['expired', 'damaged', 'self_consumed', 'giveaway', 'promotion'];
 const REASON_LABELS: Record<string, string> = { expired: '过期', damaged: '破损', self_consumed: '自喝', giveaway: '赠送', promotion: '促销' };
@@ -19,8 +19,13 @@ export default function WastagePage() {
   const [note, setNote] = useState('');
   const [shelves, setShelves] = useState<any[]>([]);
   const [records, setRecords] = useState<any[]>([]);
+  const [productNames, setProductNames] = useState<Record<number, string>>({});
 
-  useEffect(() => { shelfApi.list().then(setShelves); wastageApi.list().then(setRecords); }, []);
+  useEffect(() => {
+    shelfApi.list().then(setShelves);
+    wastageApi.list().then(setRecords);
+    productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
+  }, []);
 
   const updateItem = (idx: number, field: string, value: any) =>
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
@@ -62,7 +67,7 @@ export default function WastagePage() {
       <h3 className="text-lg font-semibold mb-2">损耗记录</h3>
       <div className="bg-white rounded-lg border overflow-hidden">
         {records.map((r: any) => (
-          <div key={r.id} className="px-4 py-2 border-b text-sm text-gray-600">#{r.id} — qty: {r.quantity} — {r.reason} — {new Date(r.created_at).toLocaleDateString()}</div>
+          <div key={r.id} className="px-4 py-2 border-b text-sm text-gray-600">{productNames[r.product_id] || `产品#${r.product_id}`} 损耗 {r.quantity} — {REASON_LABELS[r.reason] || r.reason} — {new Date(r.created_at).toLocaleDateString()}</div>
         ))}
       </div>
     </div>

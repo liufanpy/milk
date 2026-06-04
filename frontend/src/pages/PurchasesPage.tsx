@@ -3,7 +3,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ProductSelect } from '../components/business/ProductSelect';
 import CsvImportModal from '../components/business/CsvImportModal';
-import { purchaseApi, supplierApi, shelfApi } from '../services/api';
+import { purchaseApi, supplierApi, shelfApi, productApi } from '../services/api';
 
 interface ItemRow {
   product_id: number;
@@ -20,10 +20,13 @@ export default function PurchasesPage() {
   const [shelves, setShelves] = useState<any[]>([]);
   const [note, setNote] = useState('');
   const [purchases, setPurchases] = useState<any[]>([]);
+  const [productNames, setProductNames] = useState<Record<number, string>>({});
+  const [shelfNames, setShelfNames] = useState<Record<number, string>>({});
 
   useEffect(() => {
     supplierApi.list().then(setSuppliers);
-    shelfApi.list().then(setShelves);
+    shelfApi.list().then((data: any) => { setShelves(data); setShelfNames(Object.fromEntries(data.map((s: any) => [s.id, s.name]))); });
+    productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
     purchaseApi.list().then(setPurchases);
   }, []);
 
@@ -100,7 +103,7 @@ export default function PurchasesPage() {
       <div className="bg-white rounded-lg border overflow-hidden">
         {purchases.map((p: any) => (
           <div key={p.id} className="px-4 py-2 border-b text-sm text-gray-600">
-            #{p.id} — {p.direction} {p.reason} — qty: {p.quantity} — {new Date(p.created_at).toLocaleDateString()}
+            {productNames[p.product_id] || `产品#${p.product_id}`} +{p.quantity} → {shelfNames[p.shelf_id] || `货架#${p.shelf_id}`} ¥{p.unit_cost} — {new Date(p.created_at).toLocaleDateString()}
           </div>
         ))}
       </div>

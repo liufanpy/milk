@@ -3,7 +3,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ProductSelect } from '../components/business/ProductSelect';
 import { CustomerSelect } from '../components/business/CustomerSelect';
-import { returnApi, shelfApi } from '../services/api';
+import { returnApi, shelfApi, productApi } from '../services/api';
 
 interface ReturnItemRow {
   product_id: number;
@@ -20,8 +20,13 @@ export default function ReturnsPage() {
   const [note, setNote] = useState('');
   const [shelves, setShelves] = useState<any[]>([]);
   const [returns, setReturns] = useState<any[]>([]);
+  const [productNames, setProductNames] = useState<Record<number, string>>({});
 
-  useEffect(() => { shelfApi.list().then(setShelves); returnApi.list().then(setReturns); }, []);
+  useEffect(() => {
+    shelfApi.list().then(setShelves);
+    returnApi.list().then(setReturns);
+    productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
+  }, []);
 
   const updateItem = (idx: number, field: string, value: any) =>
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
@@ -71,7 +76,7 @@ export default function ReturnsPage() {
       <h3 className="text-lg font-semibold mb-2">退货记录</h3>
       <div className="bg-white rounded-lg border overflow-hidden">
         {returns.map((r: any) => (
-          <div key={r.id} className="px-4 py-2 border-b text-sm text-gray-600">#{r.id} — {r.direction} {r.reason} — qty: {r.quantity} — {new Date(r.created_at).toLocaleDateString()}</div>
+          <div key={r.id} className="px-4 py-2 border-b text-sm text-gray-600">{productNames[r.product_id] || `产品#${r.product_id}`} 退货 {r.quantity} — {new Date(r.created_at).toLocaleDateString()}</div>
         ))}
       </div>
     </div>

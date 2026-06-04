@@ -1,10 +1,20 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { dashboardApi } from '../services/api';
+import { dashboardApi, productApi, shelfApi, customerApi } from '../services/api';
 import { Badge } from '../components/ui/Badge';
 
 export default function DashboardPage() {
   const { data, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get });
   const { data: receivables = [] } = useQuery({ queryKey: ['receivables'], queryFn: dashboardApi.getReceivables });
+  const [productNames, setProductNames] = useState<Record<number, string>>({});
+  const [shelfNames, setShelfNames] = useState<Record<number, string>>({});
+  const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
+    shelfApi.list().then((data: any) => setShelfNames(Object.fromEntries(data.map((s: any) => [s.id, s.name]))));
+    customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
+  }, []);
 
   if (isLoading) return <p className="text-gray-400">加载中...</p>;
 
@@ -32,7 +42,7 @@ export default function DashboardPage() {
           {data?.low_stock?.length === 0 ? <p className="text-gray-400 text-sm">无预警</p> : (
             data?.low_stock?.map((item: any, i: number) => (
               <div key={i} className="flex justify-between text-sm py-1 border-b">
-                <span>产品#{item.product_id} 货架#{item.shelf_id}</span>
+                <span>{productNames[item.product_id] || `产品#${item.product_id}`} {shelfNames[item.shelf_id] || `货架#${item.shelf_id}`}</span>
                 <Badge variant="warning">{item.stock}</Badge>
               </div>
             ))
@@ -43,7 +53,7 @@ export default function DashboardPage() {
           {receivables.length === 0 ? <p className="text-gray-400 text-sm">无应收</p> : (
             receivables.slice(0, 5).map((item: any, i: number) => (
               <div key={i} className="flex justify-between text-sm py-1 border-b">
-                <span>客户#{item.customer_id}</span>
+                <span>{customerNames[item.customer_id] || `客户#${item.customer_id}`}</span>
                 <span className="font-medium text-red-600">¥{item.ar_balance}</span>
               </div>
             ))

@@ -3,7 +3,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ProductSelect } from '../components/business/ProductSelect';
 import { CustomerSelect } from '../components/business/CustomerSelect';
-import { saleApi, shelfApi } from '../services/api';
+import { saleApi, shelfApi, customerApi } from '../services/api';
 
 interface ItemRow {
   product_id: number;
@@ -19,10 +19,12 @@ export default function SalesPage() {
   const [shelves, setShelves] = useState<any[]>([]);
   const [note, setNote] = useState('');
   const [sales, setSales] = useState<any[]>([]);
+  const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
 
   useEffect(() => {
     shelfApi.list().then(setShelves);
     saleApi.list().then(setSales);
+    customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
   }, []);
 
   const updateItem = (idx: number, field: keyof ItemRow, value: number) => {
@@ -100,7 +102,7 @@ export default function SalesPage() {
       <div className="bg-white rounded-lg border overflow-hidden">
         {sales.map((s: any) => (
           <div key={s.id} className="px-4 py-2 border-b text-sm text-gray-600">
-            #{s.id} — {s.category} — ¥{s.amount} — {new Date(s.created_at).toLocaleDateString()}
+            {customerNames[s.customer_id] || '散客'} — ¥{s.amount} — {new Date(s.created_at).toLocaleDateString()}
           </div>
         ))}
       </div>
