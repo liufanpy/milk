@@ -108,14 +108,15 @@ class DeliveryService:
         return_total = sum(item.quantity * item.unit_price for item in data.return_items)
         new_total = sum(item.quantity * item.unit_price for item in data.new_items)
 
-        if return_total != new_total:
+        if abs(return_total - new_total) > 0.005:
             raise ValueError("换货金额不一致，请走退货结算后重新开单")
 
-        # 退回入库
         now = datetime.now()
-        movements = []
+
+        # 退回入库（先 flush 让库存对后续校验可见）
+        return_movements = []
         for item in data.return_items:
-            movements.append({
+            return_movements.append({
                 "product_id": item.product_id,
                 "shelf_id": item.shelf_id,
                 "direction": "in",
@@ -125,11 +126,13 @@ class DeliveryService:
                 "delivery_id": delivery_id,
                 "created_at": now,
             })
+        self.stock_repo.bulk_create(return_movements)
 
-        # 新发出库（带库存校验）
+        # 新发出库（带库存校验，此时退回库存已可见）
         self.stock_repo.validate_stock(data.new_items)
+        new_movements = []
         for item in data.new_items:
-            movements.append({
+            new_movements.append({
                 "product_id": item.product_id,
                 "shelf_id": item.shelf_id,
                 "direction": "out",
@@ -139,8 +142,7 @@ class DeliveryService:
                 "delivery_id": delivery_id,
                 "created_at": now,
             })
-
-        self.stock_repo.bulk_create(movements)
+        self.stock_repo.bulk_create(new_movements)
 
         self.db.commit()
         return {"return_total": return_total, "new_total": new_total}

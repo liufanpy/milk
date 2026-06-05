@@ -326,6 +326,10 @@ export default function DeliveriesPage() {
                 <ProductSelect value={item.product_id} onChange={(v) => onReturnProductChange(idx, v)} />
                 <Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" />
                 <Input type="number" placeholder="单价" value={String(item.unit_price)} onChange={(e) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: Number(e.target.value) } : it))} className="w-24" />
+                <select value={item.shelf_id} onChange={(e) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, shelf_id: Number(e.target.value) } : it))} className="w-24 border rounded px-2 py-1 text-sm">
+                  <option value="">选货架</option>
+                  {shelves.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
                 <Button variant="danger" size="sm" onClick={() => setReturnItems(returnItems.filter((_, i) => i !== idx))} disabled={returnItems.length <= 1}>×</Button>
               </div>
             ))}
@@ -338,6 +342,10 @@ export default function DeliveriesPage() {
                 <ProductSelect value={item.product_id} onChange={(v) => onNewProductChange(idx, v)} onlyInStock />
                 <Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" />
                 <Input type="number" placeholder="单价" value={String(item.unit_price)} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: Number(e.target.value) } : it))} className="w-24" />
+                <select value={item.shelf_id} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, shelf_id: Number(e.target.value) } : it))} className="w-24 border rounded px-2 py-1 text-sm">
+                  <option value="">选货架</option>
+                  {shelves.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
                 <Button variant="danger" size="sm" onClick={() => setNewItems(newItems.filter((_, i) => i !== idx))} disabled={newItems.length <= 1}>×</Button>
               </div>
             ))}
