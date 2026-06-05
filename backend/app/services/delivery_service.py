@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy.orm import Session
 from app.repositories.delivery_repo import DeliveryRepository
 from app.repositories.stock_movement_repo import StockMovementRepository
@@ -111,8 +112,10 @@ class DeliveryService:
             raise ValueError("换货金额不一致，请走退货结算后重新开单")
 
         # 退回入库
+        now = datetime.now()
+        movements = []
         for item in data.return_items:
-            self.stock_repo.bulk_create([{
+            movements.append({
                 "product_id": item.product_id,
                 "shelf_id": item.shelf_id,
                 "direction": "in",
@@ -120,12 +123,13 @@ class DeliveryService:
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
                 "delivery_id": delivery_id,
-            }])
+                "created_at": now,
+            })
 
         # 新发出库（带库存校验）
         self.stock_repo.validate_stock(data.new_items)
         for item in data.new_items:
-            self.stock_repo.bulk_create([{
+            movements.append({
                 "product_id": item.product_id,
                 "shelf_id": item.shelf_id,
                 "direction": "out",
@@ -133,7 +137,10 @@ class DeliveryService:
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
                 "delivery_id": delivery_id,
-            }])
+                "created_at": now,
+            })
+
+        self.stock_repo.bulk_create(movements)
 
         self.db.commit()
         return {"return_total": return_total, "new_total": new_total}
