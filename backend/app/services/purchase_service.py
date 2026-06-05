@@ -10,6 +10,17 @@ from app.models.supplier import Supplier
 
 PURCHASE_HEADERS = ["产品名称", "product_name", "数量", "quantity", "进价", "unit_price", "货架名称", "shelf_name", "供应商名称", "supplier_name", "日期", "date"]
 
+DATE_FORMATS = ["%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S"]
+
+
+def _parse_date(s: str) -> date:
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(s.strip(), fmt).date()
+        except ValueError:
+            continue
+    return date.today()
+
 
 class PurchaseService:
     def __init__(self, db: Session):
@@ -295,17 +306,14 @@ class PurchaseService:
                 cost = data.get("进价") or data.get("unit_price") or ""
                 cost = float(cost) if cost else default_cost
                 date_str = (data.get("日期") or data.get("date") or "").strip()
-                try:
-                    item_date = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else date.today()
-                except ValueError:
-                    item_date = date.today()
+                item_date = _parse_date(date_str) if date_str else date.today()
                 total += qty * cost
                 movements.append({
                     "product_id": pid, "shelf_id": shelf_id,
                     "direction": "in", "reason": "purchase",
                     "quantity": qty, "unit_price": cost,
                     "purchase_order_id": order.id,
-                    "created_at": datetime.now() if not date_str else datetime.strptime(date_str, "%Y-%m-%d"),
+                    "created_at": datetime.now() if not date_str else datetime.combine(item_date, datetime.min.time()),
                 })
 
             if movements:
