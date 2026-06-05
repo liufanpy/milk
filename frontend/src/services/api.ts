@@ -19,7 +19,7 @@ export const productApi = {
 
 // Customers
 export const customerApi = {
-  list: (keyword = '') => api.get('/customers', { params: { keyword } }).then(r => r.data),
+  list: (keyword = '', priceTier = '') => api.get('/customers', { params: { keyword, price_tier: priceTier } }).then(r => r.data),
   get: (id: number) => api.get(`/customers/${id}`).then(r => r.data),
   create: (data: any) => api.post('/customers', data).then(r => r.data),
   update: (id: number, data: any) => api.put(`/customers/${id}`, data).then(r => r.data),
