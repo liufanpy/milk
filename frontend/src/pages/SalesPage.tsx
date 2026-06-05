@@ -70,7 +70,7 @@ export default function SalesPage() {
       <div className="bg-white rounded-lg border p-4 mb-6 space-y-3">
         <div>
           <label className="text-sm font-medium text-gray-700">客户（留空为散客）</label>
-          <CustomerSelect value={customerId} onChange={setCustomerId} />
+          <CustomerSelect value={customerId} onChange={setCustomerId} priceTier="零售" />
         </div>
         {items.map((item, idx) => (
           <div key={idx} className="flex gap-2 items-end">
