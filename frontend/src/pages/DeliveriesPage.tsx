@@ -170,7 +170,7 @@ export default function DeliveriesPage() {
         </div>
         {items.map((item, idx) => (
           <div key={idx} className="flex gap-2 items-end">
-            <div className="flex-1"><label className="text-xs text-gray-500">产品</label><ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} /></div>
+            <div className="flex-1"><label className="text-xs text-gray-500">产品</label><ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} onlyInStock /></div>
             <div className="w-20"><label className="text-xs text-gray-500">数量</label><Input type="number" value={String(item.quantity)} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} /></div>
             <div className="w-24"><label className="text-xs text-gray-500">售价</label><Input type="number" value={String(item.unit_price)} onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))} /></div>
             <div className="flex-1">
@@ -288,7 +288,7 @@ export default function DeliveriesPage() {
             <h4 className="text-sm font-medium mb-2">新品项</h4>
             {newItems.map((item, idx) => (
               <div key={idx} className="flex gap-2 mb-2">
-                <ProductSelect value={item.product_id} onChange={(v) => onNewProductChange(idx, v)} />
+                <ProductSelect value={item.product_id} onChange={(v) => onNewProductChange(idx, v)} onlyInStock />
                 <Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" />
                 <Input type="number" placeholder="单价" value={String(item.unit_price)} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: Number(e.target.value) } : it))} className="w-24" />
                 <Button variant="danger" size="sm" onClick={() => setNewItems(newItems.filter((_, i) => i !== idx))} disabled={newItems.length <= 1}>×</Button>

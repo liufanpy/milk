@@ -89,7 +89,7 @@ export default function SubscriptionsPage() {
         <div className="space-y-3">
           {deductItems.map((item, idx) => (
             <div key={idx} className="flex gap-2">
-              <ProductSelect value={item.product_id} onChange={(v) => setDeductItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: v } : it))} />
+              <ProductSelect value={item.product_id} onChange={(v) => setDeductItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: v } : it))} onlyInStock />
               <Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => setDeductItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" />
               <Button variant="danger" size="sm" onClick={() => setDeductItems(deductItems.filter((_, i) => i !== idx))} disabled={deductItems.length <= 1}>×</Button>
             </div>

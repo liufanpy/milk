@@ -1,5 +1,5 @@
 import io
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -18,7 +18,10 @@ def get_wastage_service(db: Session = Depends(get_db)):
 
 @router.post("", status_code=201)
 def create_wastage(data: WastageCreate, svc: WastageService = Depends(get_wastage_service)):
-    return svc.create_wastage(data)
+    try:
+        return svc.create_wastage(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("")

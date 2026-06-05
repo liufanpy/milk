@@ -76,7 +76,7 @@ export default function SalesPage() {
           <div key={idx} className="flex gap-2 items-end">
             <div className="flex-1">
               <label className="text-xs text-gray-500">产品</label>
-              <ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} />
+              <ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} onlyInStock />
             </div>
             <div className="w-20">
               <label className="text-xs text-gray-500">数量</label>

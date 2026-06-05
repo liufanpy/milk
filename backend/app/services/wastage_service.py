@@ -9,6 +9,15 @@ class WastageService:
         self.stock_repo = StockMovementRepository(db)
 
     def create_wastage(self, data: WastageCreate):
+        inventory = {
+            (r.product_id, r.shelf_id): r.stock
+            for r in self.stock_repo.get_inventory()
+        }
+        for item in data.items:
+            stock = inventory.get((item.product_id, item.shelf_id), 0)
+            if stock < item.quantity:
+                raise ValueError(f"产品库存不足，当前库存 {stock}，需要 {item.quantity}")
+
         movements = []
         for item in data.items:
             movements.append({

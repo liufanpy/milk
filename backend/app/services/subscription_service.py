@@ -38,6 +38,15 @@ class SubscriptionService:
         if order.remaining_bottles < total_qty:
             raise ValueError(f"瓶数不足，剩余 {order.remaining_bottles} 瓶")
 
+        inventory = {
+            (r.product_id, r.shelf_id): r.stock
+            for r in self.stock_repo.get_inventory()
+        }
+        for item in data.items:
+            stock = inventory.get((item.product_id, data.shelf_id), 0)
+            if stock < item.quantity:
+                raise ValueError(f"产品库存不足，当前库存 {stock}，需要 {item.quantity}")
+
         movements = []
         for item in data.items:
             movements.append({

@@ -44,7 +44,7 @@ export default function WastagePage() {
       <div className="bg-white rounded-lg border p-4 mb-6 space-y-3">
         {items.map((item, idx) => (
           <div key={idx} className="flex gap-2 items-end">
-            <div className="flex-1"><ProductSelect value={item.product_id} onChange={(v) => updateItem(idx, 'product_id', v)} /></div>
+            <div className="flex-1"><ProductSelect value={item.product_id} onChange={(v) => updateItem(idx, 'product_id', v)} onlyInStock /></div>
             <div className="w-20"><Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} /></div>
             <div className="flex-1">
               <select value={item.shelf_id} onChange={(e) => updateItem(idx, 'shelf_id', Number(e.target.value))} className="w-full border rounded px-2 py-1 text-sm">
