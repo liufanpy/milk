@@ -127,6 +127,21 @@ export default function DeliveriesPage() {
 
   const handleExchange = async () => {
     if (!selectedDelivery) return;
+
+    const returnTotal = returnItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+    const newTotal = newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+
+    if (returnTotal !== newTotal) {
+      alert('换货金额不一致，请走退货结算后重新开单');
+      return;
+    }
+
+    if (returnItems.some(i => !i.product_id || !i.shelf_id || !i.quantity) ||
+        newItems.some(i => !i.product_id || !i.shelf_id || !i.quantity)) {
+      alert('请填写完整信息');
+      return;
+    }
+
     try {
       await exchangeMutation.mutateAsync({
         id: selectedDelivery.id,
@@ -295,6 +310,13 @@ export default function DeliveriesPage() {
               </div>
             ))}
             <Button variant="secondary" size="sm" onClick={() => setNewItems([...newItems, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }])}>+</Button>
+          </div>
+          <div className="text-sm text-gray-500 pt-2 border-t">
+            <div>退回合计: ¥{returnItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toFixed(2)}</div>
+            <div>新发合计: ¥{newItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toFixed(2)}</div>
+            {returnItems.reduce((s, i) => s + i.quantity * i.unit_price, 0) !== newItems.reduce((s, i) => s + i.quantity * i.unit_price, 0) && (
+              <div className="text-red-500 font-medium">金额不一致，无法换货</div>
+            )}
           </div>
           <Button onClick={handleExchange} disabled={exchangeMutation.isPending}>确认换货</Button>
         </div>
