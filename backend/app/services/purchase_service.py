@@ -8,7 +8,7 @@ from app.models.product import Product
 from app.models.shelf import Shelf
 from app.models.supplier import Supplier
 
-PURCHASE_HEADERS = ["产品名称", "product_name", "数量", "quantity", "进价", "unit_cost", "货架名称", "shelf_name", "供应商名称", "supplier_name", "日期", "date"]
+PURCHASE_HEADERS = ["产品名称", "product_name", "数量", "quantity", "进价", "unit_price", "货架名称", "shelf_name", "供应商名称", "supplier_name", "日期", "date"]
 
 
 class PurchaseService:
@@ -37,7 +37,7 @@ class PurchaseService:
     # ── 创建进货单 ────────────────────────────────
 
     def create_purchase(self, data: PurchaseCreate):
-        total = sum(item.quantity * item.unit_cost for item in data.items)
+        total = sum(item.quantity * item.unit_price for item in data.items)
         order = PurchaseOrder(
             order_number=self._next_order_number(),
             supplier_id=data.supplier_id,
@@ -67,7 +67,7 @@ class PurchaseService:
         if items:
             total = sum(
                 (it["quantity"] if isinstance(it, dict) else it.quantity) *
-                (it["unit_cost"] if isinstance(it, dict) else it.unit_cost)
+                (it["unit_price"] if isinstance(it, dict) else it.unit_price)
                 for it in items
             )
             order.total_amount = total
@@ -84,7 +84,7 @@ class PurchaseService:
         movements = []
         for item in items:
             qty = item["quantity"] if isinstance(item, dict) else item.quantity
-            cost = item["unit_cost"] if isinstance(item, dict) else item.unit_cost
+            cost = item["unit_price"] if isinstance(item, dict) else item.unit_price
             total += qty * cost
             movements.append({
                 "product_id": item["product_id"] if isinstance(item, dict) else item.product_id,
@@ -92,7 +92,7 @@ class PurchaseService:
                 "direction": "in",
                 "reason": "purchase",
                 "quantity": qty,
-                "unit_cost": cost,
+                "unit_price": cost,
                 "purchase_order_id": order_id,
             })
 
@@ -132,10 +132,10 @@ class PurchaseService:
                     "direction": "out",
                     "reason": "purchase_cancel",
                     "quantity": item.quantity,
-                    "unit_cost": item.unit_cost,
+                    "unit_price": item.unit_price,
                     "purchase_order_id": order_id,
                 })
-                reverse_total += item.quantity * item.unit_cost
+                reverse_total += item.quantity * item.unit_price
 
             if reverses:
                 self.stock_repo.bulk_create(reverses)
@@ -192,7 +192,7 @@ class PurchaseService:
                 "product_id": i.product_id,
                 "product_name": products.get(i.product_id, ""),
                 "quantity": i.quantity,
-                "unit_cost": i.unit_cost,
+                "unit_price": i.unit_price,
                 "shelf_id": i.shelf_id,
                 "shelf_name": shelves.get(i.shelf_id, ""),
             }
@@ -292,7 +292,7 @@ class PurchaseService:
                     errors.append({"row": data.get("index", "?"), "msg": f"货架'{sname}'不存在"})
                     continue
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
-                cost = data.get("进价") or data.get("unit_cost") or ""
+                cost = data.get("进价") or data.get("unit_price") or ""
                 cost = float(cost) if cost else default_cost
                 date_str = (data.get("日期") or data.get("date") or "").strip()
                 try:
@@ -303,7 +303,7 @@ class PurchaseService:
                 movements.append({
                     "product_id": pid, "shelf_id": shelf_id,
                     "direction": "in", "reason": "purchase",
-                    "quantity": qty, "unit_cost": cost,
+                    "quantity": qty, "unit_price": cost,
                     "purchase_order_id": order.id,
                     "created_at": datetime.now() if not date_str else datetime.strptime(date_str, "%Y-%m-%d"),
                 })

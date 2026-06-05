@@ -6,7 +6,7 @@ from datetime import date, datetime
 class PurchaseItem(BaseModel):
     product_id: int
     quantity: int
-    unit_cost: float
+    unit_price: float
     shelf_id: int
 
 

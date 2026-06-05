@@ -12,7 +12,7 @@ class StockMovement(Base):
     direction = Column(String(10), nullable=False)
     reason = Column(String(30), nullable=False)
     quantity = Column(Integer, nullable=False)
-    unit_cost = Column(Float, default=0.0)
+    unit_price = Column(Float, default=0.0)
     delivery_id = Column(Integer, ForeignKey("deliveries.id"), nullable=True)
     subscription_order_id = Column(Integer, ForeignKey("subscription_orders.id"), nullable=True)
     purchase_order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)

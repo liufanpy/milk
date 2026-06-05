@@ -42,7 +42,7 @@ class DeliveryService:
                 "direction": "out",
                 "reason": "delivery",
                 "quantity": item.quantity,
-                "unit_cost": item.unit_price,
+                "unit_price": item.unit_price,
                 "delivery_id": delivery.id,
             })
 
@@ -107,7 +107,7 @@ class DeliveryService:
                 "direction": "in",
                 "reason": "return",
                 "quantity": item.quantity,
-                "unit_cost": item.unit_price,
+                "unit_price": item.unit_price,
                 "delivery_id": delivery_id,
             }])
 
@@ -129,7 +129,7 @@ class DeliveryService:
                 "direction": "out",
                 "reason": "delivery",
                 "quantity": item.quantity,
-                "unit_cost": item.unit_price,
+                "unit_price": item.unit_price,
                 "delivery_id": delivery_id,
             }])
 
