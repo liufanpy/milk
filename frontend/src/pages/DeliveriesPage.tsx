@@ -176,7 +176,7 @@ export default function DeliveriesPage() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium text-gray-700">客户</label>
-            <CustomerSelect value={customerId} onChange={(v) => setCustomerId(v)} />
+            <CustomerSelect value={customerId} onChange={(v) => setCustomerId(v)} priceTier="批发" />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700">日期</label>
@@ -213,7 +213,7 @@ export default function DeliveriesPage() {
       <div className="bg-white rounded-lg border p-4">
         <h3 className="font-semibold mb-3">送货单列表</h3>
         <div className="flex gap-3 mb-3">
-          <CustomerSelect value={filterCustomer} onChange={(v) => setFilterCustomer(v)} />
+          <CustomerSelect value={filterCustomer} onChange={(v) => setFilterCustomer(v)} priceTier="批发" />
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="border rounded px-3 py-2 text-sm">
             <option value="">全部状态</option>
             <option value="pending">待配送</option>
