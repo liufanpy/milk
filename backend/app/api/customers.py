@@ -16,9 +16,10 @@ def get_customer_service(db: Session = Depends(get_db)):
 @router.get("", response_model=list[CustomerOut])
 def list_customers(
     keyword: str = Query(""),
+    price_tier: str = Query(""),
     svc: CustomerService = Depends(get_customer_service),
 ):
-    return svc.list_customers(keyword)
+    return svc.list_customers(keyword, price_tier=price_tier)
 
 
 @router.get("/export")

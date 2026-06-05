@@ -18,8 +18,8 @@ class CustomerService:
         self.price_repo = ProductCustomerPriceRepository(db)
         self.db = db
 
-    def list_customers(self, keyword: str = ""):
-        return self.repo.search(keyword)
+    def list_customers(self, keyword: str = "", price_tier: str = ""):
+        return self.repo.search(keyword, price_tier=price_tier)
 
     def get_customer(self, customer_id: int):
         return self.repo.get_by_id(customer_id)
