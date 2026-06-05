@@ -9,14 +9,19 @@ interface ProductSelectProps {
 export function ProductSelect({ value, onChange, onlyInStock }: ProductSelectProps) {
   const [products, setProducts] = useState<any[]>([]);
   useEffect(() => {
+    let cancelled = false;
     if (onlyInStock) {
-      Promise.all([productApi.list(), dashboardApi.getInventory()]).then(([all, inv]) => {
-        const inStockIds = new Set((inv as any[]).map((r: any) => r.product_id));
-        setProducts(all.filter((p: any) => inStockIds.has(p.id)));
-      });
+      Promise.all([productApi.list(), dashboardApi.getInventory()])
+        .then(([all, inv]) => {
+          if (cancelled) return;
+          const inStockIds = new Set((inv as any[]).map((r: any) => r.product_id));
+          setProducts(all.filter((p: any) => inStockIds.has(p.id)));
+        })
+        .catch(() => {});
     } else {
-      productApi.list().then(setProducts);
+      productApi.list().then((data) => { if (!cancelled) setProducts(data); }).catch(() => {});
     }
+    return () => { cancelled = true; };
   }, [onlyInStock]);
   return (
     <select
