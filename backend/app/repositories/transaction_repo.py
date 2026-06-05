@@ -50,5 +50,29 @@ class TransactionRepository:
             .all()
         )
 
+    def get_amounts_by_deliveries(self, delivery_ids: list[int]) -> dict[int, dict]:
+        """批量获取多个送货单的金额汇总 {delivery_id: {total_amount, paid_amount}}"""
+        if not delivery_ids:
+            return {}
+        rows = (
+            self.db.query(
+                Transaction.delivery_id,
+                Transaction.category,
+                func.sum(Transaction.amount).label("total"),
+            )
+            .filter(Transaction.delivery_id.in_(delivery_ids))
+            .group_by(Transaction.delivery_id, Transaction.category)
+            .all()
+        )
+        result: dict[int, dict] = {did: {"total_amount": 0.0, "paid_amount": 0.0} for did in delivery_ids}
+        for row in rows:
+            if row.category in ("delivery", "delivery_cancel"):
+                result[row.delivery_id]["total_amount"] += row.total
+            elif row.category == "payment":
+                result[row.delivery_id]["paid_amount"] += row.total
+        for did, amounts in result.items():
+            amounts["unpaid_amount"] = amounts["total_amount"] - amounts["paid_amount"]
+        return result
+
     def list_all(self):
         return self.db.query(Transaction).order_by(Transaction.created_at.desc()).limit(200).all()

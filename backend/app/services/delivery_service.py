@@ -13,6 +13,28 @@ class DeliveryService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
+    def list_with_amounts(self, customer_id=None, status=None):
+        deliveries = self.delivery_repo.list_all(customer_id, status)
+        if not deliveries:
+            return []
+        ids = [d.id for d in deliveries]
+        amounts = self.txn_repo.get_amounts_by_deliveries(ids)
+        return [
+            {
+                "id": d.id,
+                "customer_id": d.customer_id,
+                "delivery_date": str(d.delivery_date),
+                "status": d.status,
+                "note": d.note,
+                "subscription_order_id": d.subscription_order_id,
+                "created_at": str(d.created_at) if d.created_at else None,
+                "total_amount": amounts[d.id]["total_amount"],
+                "paid_amount": amounts[d.id]["paid_amount"],
+                "unpaid_amount": amounts[d.id]["unpaid_amount"],
+            }
+            for d in deliveries
+        ]
+
     def create_delivery(self, data: DeliveryCreate):
         self.stock_repo.validate_stock(data.items)
 

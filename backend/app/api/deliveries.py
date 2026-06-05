@@ -30,7 +30,7 @@ def list_deliveries(
     status: Optional[str] = Query(None),
     svc: DeliveryService = Depends(get_delivery_service),
 ):
-    return svc.delivery_repo.list_all(customer_id, status)
+    return svc.list_with_amounts(customer_id, status)
 
 
 @router.get("/export")
