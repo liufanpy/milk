@@ -20,10 +20,17 @@ class SettlementService:
             amount=amount,
             delivery_id=delivery_id,
         )
+
+        amounts = self.txn_repo.get_amounts_by_deliveries([delivery_id])
+        info = amounts.get(delivery_id, {})
+        if info.get("unpaid_amount", 0) <= 0:
+            delivery.status = "settled"
+
         self.db.commit()
         return {"delivery_id": delivery_id, "paid": amount}
 
     def batch_settle(self, customer_id: int, items: list[dict]):
+        delivery_ids = [item["delivery_id"] for item in items]
         results = []
         for item in items:
             delivery = self.delivery_repo.get_by_id(item["delivery_id"])
@@ -38,5 +45,14 @@ class SettlementService:
                 delivery_id=item["delivery_id"],
             )
             results.append({"delivery_id": item["delivery_id"], "paid": item["amount"]})
+
+        amounts = self.txn_repo.get_amounts_by_deliveries(delivery_ids)
+        for did in delivery_ids:
+            info = amounts.get(did, {})
+            if info.get("unpaid_amount", 0) <= 0:
+                delivery = self.delivery_repo.get_by_id(did)
+                if delivery:
+                    delivery.status = "settled"
+
         self.db.commit()
         return {"results": results}

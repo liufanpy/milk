@@ -218,6 +218,7 @@ export default function DeliveriesPage() {
             <option value="">全部状态</option>
             <option value="pending">待配送</option>
             <option value="delivered">已送达</option>
+            <option value="settled">已结算</option>
           </select>
         </div>
         <div className="overflow-x-auto">
@@ -231,7 +232,7 @@ export default function DeliveriesPage() {
                   <td className="px-4 py-2">#{d.id}</td>
                   <td className="px-4 py-2">{customerNames[d.customer_id] || `客户#${d.customer_id}`}</td>
                   <td className="px-4 py-2">{d.delivery_date || d.created_at?.slice(0, 10)}</td>
-                  <td className="px-4 py-2"><Badge variant={d.status === 'delivered' ? 'success' : 'warning'}>{d.status}</Badge></td>
+                  <td className="px-4 py-2"><Badge variant={d.status === 'delivered' || d.status === 'settled' ? 'success' : 'warning'}>{d.status === 'settled' ? '已结算' : d.status === 'delivered' ? '已送达' : d.status}</Badge></td>
                   <td className="px-4 py-2">¥{d.total_amount || 0}</td>
                   <td className="px-4 py-2 text-green-600">¥{d.paid_amount || 0}</td>
                   <td className="px-4 py-2 text-red-600 font-medium">¥{d.unpaid_amount || 0}</td>
