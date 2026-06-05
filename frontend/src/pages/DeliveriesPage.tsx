@@ -259,6 +259,37 @@ export default function DeliveriesPage() {
                 <div key={i} className="text-sm text-gray-600 border-b py-1">{productNames[item.product_id] || `产品#${item.product_id}`} — qty: {item.quantity}</div>
               ))}
             </div>
+            {selectedDelivery.exchanges && selectedDelivery.exchanges.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">换货记录</h4>
+                <div className="space-y-2">
+                  {selectedDelivery.exchanges.map((ex: any, i: number) => (
+                    <div key={i} className="bg-gray-50 rounded p-3 text-sm">
+                      <div className="text-gray-400 text-xs mb-1">
+                        {new Date(ex.created_at).toLocaleString()}
+                      </div>
+                      <div className="text-gray-600">
+                        退回: {ex.return_items.map((it: any) =>
+                          `${productNames[it.product_id] || '产品#' + it.product_id} ×${it.quantity} (¥${it.unit_price})`
+                        ).join(', ')}
+                      </div>
+                      <div className="text-gray-600">
+                        新发: {ex.new_items.map((it: any) =>
+                          `${productNames[it.product_id] || '产品#' + it.product_id} ×${it.quantity} (¥${it.unit_price})`
+                        ).join(', ')}
+                      </div>
+                      <div className="text-gray-400 text-xs mt-1">
+                        {ex.return_items.length === ex.new_items.length &&
+                         ex.return_items.every((it: any, j: number) =>
+                           it.product_id === ex.new_items[j].product_id &&
+                           it.quantity === ex.new_items[j].quantity
+                         ) ? '同产品换货' : '等值换货'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <h4 className="text-sm font-medium mb-1">收款记录</h4>
               {selectedDelivery.transactions?.map((t: any) => (
