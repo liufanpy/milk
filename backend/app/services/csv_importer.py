@@ -24,7 +24,7 @@ def parse_csv(file_content: bytes, validate_row: Callable, allowed_headers: list
     error = 0
     for idx, raw_row in enumerate(reader):
         # 跳过全空行
-        row = {k.strip(): v.strip() for k, v in raw_row.items() if k and k.strip()}
+        row = {k.strip(): (v or "").strip() for k, v in raw_row.items() if k and k.strip()}
         if not any(v for v in row.values()):
             continue
 

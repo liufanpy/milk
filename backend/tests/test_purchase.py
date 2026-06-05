@@ -106,3 +106,53 @@ class TestPurchaseCreate:
         inventory = client.get("/api/inventory").json()
         stock = next((r for r in inventory if r["product_id"] == p.id), None)
         assert stock is None or stock["stock"] == 0
+
+
+class TestPurchaseRoutes:
+    def test_export_route_not_blocked_by_order_id(self, client, seed_data):
+        """GET /export 不应被 /{order_id} 拦截"""
+        resp = client.get("/api/purchases/export")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/csv")
+
+    def test_import_preview_route_works(self, client, seed_data):
+        """POST /import 不应被 /{order_id}/confirm 拦截"""
+        import io
+        csv = "产品名称,数量,进价,货架名称,供应商名称\r\n蒙牛鲜奶,10,35,仓库A区,蒙牛代理"
+        resp = client.post("/api/purchases/import",
+            files=[("file", ("test.csv", io.BytesIO(csv.encode("utf-8-sig")), "text/csv"))])
+        assert resp.status_code == 200
+        assert resp.json()["summary"]["ok"] >= 1
+
+    def test_import_confirm_route_works(self, client, seed_data):
+        """POST /import/confirm 不应被 /{order_id}/confirm 拦截"""
+        resp = client.post("/api/purchases/import/confirm", json={
+            "rows": [{"data": {
+                "产品名称": "蒙牛鲜奶",
+                "数量": "5",
+                "进价": "35",
+                "货架名称": "仓库A区",
+                "供应商名称": "蒙牛代理",
+            }}]
+        })
+        assert resp.status_code == 200
+        assert resp.json()["success"] == 1
+        # 确认库存变化
+        inventory = client.get("/api/inventory").json()
+        stock = next((r for r in inventory if r["product_id"] == seed_data["products"][0].id), None)
+        assert stock is not None and stock["stock"] == 5
+
+    def test_import_accepts_slash_date_format(self, client, seed_data):
+        """导入支持 2026/6/4 这种日期格式"""
+        resp = client.post("/api/purchases/import/confirm", json={
+            "rows": [{"data": {
+                "产品名称": "伊利酸奶",
+                "数量": "3",
+                "进价": "42",
+                "日期": "2026/6/4",
+                "货架名称": "仓库A区",
+                "供应商名称": "蒙牛代理",
+            }}]
+        })
+        assert resp.status_code == 200
+        assert resp.json()["success"] == 1
