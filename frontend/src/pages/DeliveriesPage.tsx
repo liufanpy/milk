@@ -104,6 +104,9 @@ export default function DeliveriesPage() {
   };
 
   const exchangeCustomerId = selectedDelivery?.customer_id;
+  const returnTotal = returnItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+  const newTotal = newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+  const exchangeAmountMatch = Math.abs(returnTotal - newTotal) < 0.001;
 
   const onReturnProductChange = async (idx: number, productId: number) => {
     setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: productId } : it));
@@ -128,10 +131,7 @@ export default function DeliveriesPage() {
   const handleExchange = async () => {
     if (!selectedDelivery) return;
 
-    const returnTotal = returnItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
-    const newTotal = newItems.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
-
-    if (returnTotal !== newTotal) {
+    if (!exchangeAmountMatch) {
       alert('换货金额不一致，请走退货结算后重新开单');
       return;
     }
@@ -312,9 +312,9 @@ export default function DeliveriesPage() {
             <Button variant="secondary" size="sm" onClick={() => setNewItems([...newItems, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }])}>+</Button>
           </div>
           <div className="text-sm text-gray-500 pt-2 border-t">
-            <div>退回合计: ¥{returnItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toFixed(2)}</div>
-            <div>新发合计: ¥{newItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toFixed(2)}</div>
-            {returnItems.reduce((s, i) => s + i.quantity * i.unit_price, 0) !== newItems.reduce((s, i) => s + i.quantity * i.unit_price, 0) && (
+            <div>退回合计: ¥{returnTotal.toFixed(2)}</div>
+            <div>新发合计: ¥{newTotal.toFixed(2)}</div>
+            {!exchangeAmountMatch && (
               <div className="text-red-500 font-medium">金额不一致，无法换货</div>
             )}
           </div>
