@@ -48,5 +48,16 @@ class StockMovementRepository:
             .all()
         )
 
+    def validate_stock(self, items: list, shelf_id: int | None = None):
+        inventory = {
+            (r.product_id, r.shelf_id): r.stock
+            for r in self.get_inventory()
+        }
+        for item in items:
+            sid = shelf_id if shelf_id is not None else item.shelf_id
+            stock = inventory.get((item.product_id, sid), 0)
+            if stock < item.quantity:
+                raise ValueError(f"产品库存不足，当前库存 {stock}，需要 {item.quantity}")
+
     def list_all(self):
         return self.db.query(StockMovement).order_by(StockMovement.created_at.desc()).all()
