@@ -11,7 +11,7 @@ import type { PurchaseOrder, PurchaseOrderDetail } from '../types';
 interface ItemRow {
   product_id: number;
   quantity: number;
-  unit_cost: number;
+  unit_price: number;
   shelf_id: number;
 }
 
@@ -30,11 +30,12 @@ export default function PurchasesPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [supplierId, setSupplierId] = useState<number | string>('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10));
-  const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_cost: 0, shelf_id: 0 }]);
+  const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [shelves, setShelves] = useState<any[]>([]);
   const [note, setNote] = useState('');
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [productNames, setProductNames] = useState<Record<number, string>>({});
   const [shelfNames, setShelfNames] = useState<Record<number, string>>({});
 
@@ -45,7 +46,10 @@ export default function PurchasesPage() {
   useEffect(() => {
     supplierApi.list().then(setSuppliers);
     shelfApi.list().then((data: any) => { setShelves(data); setShelfNames(Object.fromEntries(data.map((s: any) => [s.id, s.name]))); });
-    productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
+    productApi.list().then((data: any) => {
+      setProducts(data);
+      setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name])));
+    });
     purchaseApi.list().then(setOrders);
   }, []);
 
@@ -55,13 +59,23 @@ export default function PurchasesPage() {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
   };
 
-  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_cost: 0, shelf_id: 0 }]);
+  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
   const removeRow = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+
+  const onProductChange = (idx: number, productId: number) => {
+    updateItem(idx, 'product_id', productId);
+    if (productId) {
+      const product = products.find(p => p.id === productId);
+      if (product?.default_purchase_price) {
+        updateItem(idx, 'unit_price', product.default_purchase_price);
+      }
+    }
+  };
 
   const resetForm = () => {
     setSupplierId('');
     setPurchaseDate(new Date().toISOString().slice(0, 10));
-    setItems([{ product_id: 0, quantity: 1, unit_cost: 0, shelf_id: 0 }]);
+    setItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
     setNote('');
   };
 
@@ -95,7 +109,7 @@ export default function PurchasesPage() {
     setDetailOpen(true);
   };
 
-  const total = items.reduce((sum, i) => sum + i.quantity * i.unit_cost, 0);
+  const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
   const statusBadge = (status: string) => (
     <Badge variant={STATUS_VARIANT[status] || 'default'}>{STATUS_LABEL[status] || status}</Badge>
   );
@@ -130,15 +144,15 @@ export default function PurchasesPage() {
           <div key={idx} className="flex gap-2 items-end">
             <div className="flex-1">
               <label className="text-xs text-gray-500">产品</label>
-              <ProductSelect value={item.product_id} onChange={(v) => updateItem(idx, 'product_id', v)} />
+              <ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} />
             </div>
             <div className="w-20">
               <label className="text-xs text-gray-500">数量</label>
               <Input type="number" value={String(item.quantity)} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} />
             </div>
             <div className="w-24">
-              <label className="text-xs text-gray-500">进价</label>
-              <Input type="number" value={String(item.unit_cost)} onChange={(e) => updateItem(idx, 'unit_cost', Number(e.target.value))} />
+              <label className="text-xs text-gray-500">单价</label>
+              <Input type="number" value={String(item.unit_price)} onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))} />
             </div>
             <div className="flex-1">
               <label className="text-xs text-gray-500">货架</label>
@@ -232,8 +246,8 @@ export default function PurchasesPage() {
                   <tr key={i} className="border-t">
                     <td className="px-2 py-1">{it.product_name}</td>
                     <td className="px-2 py-1 text-right">{it.quantity}</td>
-                    <td className="px-2 py-1 text-right">¥{it.unit_cost.toFixed(2)}</td>
-                    <td className="px-2 py-1 text-right">¥{(it.quantity * it.unit_cost).toFixed(2)}</td>
+                    <td className="px-2 py-1 text-right">¥{it.unit_price.toFixed(2)}</td>
+                    <td className="px-2 py-1 text-right">¥{(it.quantity * it.unit_price).toFixed(2)}</td>
                     <td className="px-2 py-1">{it.shelf_name}</td>
                   </tr>
                 ))}

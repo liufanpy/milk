@@ -111,7 +111,7 @@ export interface CreateCustomerData {
 export interface PurchaseItem {
   product_id: number;
   quantity: number;
-  unit_cost: number;
+  unit_price: number;
   shelf_id: number;
 }
 
@@ -149,7 +149,7 @@ export interface PurchaseOrderDetailItem {
   product_id: number;
   product_name: string;
   quantity: number;
-  unit_cost: number;
+  unit_price: number;
   shelf_id: number;
   shelf_name: string;
 }
