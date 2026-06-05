@@ -65,17 +65,38 @@ class DeliveryService:
 
         net = delivery_total + delivery_cancel_total
 
+        # 换货记录：按 created_at 分组
+        exchange_movements = [m for m in movements if m.reason == "exchange"]
+        groups: dict = {}
+        for m in exchange_movements:
+            groups.setdefault(m.created_at, []).append(m)
+        exchanges = [
+            {
+                "created_at": str(ts),
+                "return_items": [
+                    {"product_id": m.product_id, "quantity": m.quantity, "unit_price": m.unit_price}
+                    for m in ms if m.direction == "in"
+                ],
+                "new_items": [
+                    {"product_id": m.product_id, "quantity": m.quantity, "unit_price": m.unit_price}
+                    for m in ms if m.direction == "out"
+                ],
+            }
+            for ts, ms in groups.items()
+        ]
+
         return {
             "id": delivery.id,
             "customer_id": delivery.customer_id,
             "delivery_date": str(delivery.delivery_date),
             "status": delivery.status,
             "note": delivery.note,
-            "items": [{"product_id": m.product_id, "quantity": m.quantity, "reason": m.reason, "direction": m.direction} for m in movements],
+            "items": [{"product_id": m.product_id, "quantity": m.quantity, "reason": m.reason, "direction": m.direction} for m in movements if m.reason != "exchange"],
             "total_amount": net,
             "paid_amount": paid_total,
             "unpaid_amount": net - paid_total,
             "transactions": [{"id": t.id, "category": t.category, "amount": t.amount, "created_at": str(t.created_at)} for t in transactions],
+            "exchanges": exchanges,
         }
 
     def exchange(self, delivery_id: int, data: ExchangeCreate):
