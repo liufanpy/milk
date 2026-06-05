@@ -5,10 +5,11 @@ interface CustomerSelectProps {
   value: number | string;
   onChange: (customerId: number) => void;
   allowEmpty?: boolean;
+  priceTier?: string;
 }
-export function CustomerSelect({ value, onChange, allowEmpty = true }: CustomerSelectProps) {
+export function CustomerSelect({ value, onChange, allowEmpty = true, priceTier }: CustomerSelectProps) {
   const [customers, setCustomers] = useState<any[]>([]);
-  useEffect(() => { customerApi.list().then(setCustomers); }, []);
+  useEffect(() => { customerApi.list('', priceTier).then(setCustomers); }, [priceTier]);
   return (
     <select
       value={value}
