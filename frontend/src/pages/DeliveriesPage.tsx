@@ -269,17 +269,18 @@ export default function DeliveriesPage() {
                         {new Date(ex.created_at).toLocaleString()}
                       </div>
                       <div className="text-gray-600">
-                        退回: {ex.return_items.map((it: any) =>
+                        退回: {(ex.return_items ?? []).map((it: any) =>
                           `${productNames[it.product_id] || '产品#' + it.product_id} ×${it.quantity} (¥${it.unit_price})`
                         ).join(', ')}
                       </div>
                       <div className="text-gray-600">
-                        新发: {ex.new_items.map((it: any) =>
+                        新发: {(ex.new_items ?? []).map((it: any) =>
                           `${productNames[it.product_id] || '产品#' + it.product_id} ×${it.quantity} (¥${it.unit_price})`
                         ).join(', ')}
                       </div>
                       <div className="text-gray-400 text-xs mt-1">
-                        {ex.return_items.length === ex.new_items.length &&
+                        {ex.return_items?.length > 0 && ex.new_items?.length > 0 &&
+                         ex.return_items.length === ex.new_items.length &&
                          ex.return_items.every((it: any, j: number) =>
                            it.product_id === ex.new_items[j].product_id &&
                            it.quantity === ex.new_items[j].quantity
