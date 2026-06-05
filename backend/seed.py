@@ -35,10 +35,10 @@ try:
     db.commit()
 
     # A purchase (seed stock)
-    sm1 = StockMovement(product_id=p1.id, shelf_id=sh1.id, direction="in", reason="purchase", quantity=50, unit_cost=35, created_at=datetime.utcnow())
-    sm2 = StockMovement(product_id=p2.id, shelf_id=sh1.id, direction="in", reason="purchase", quantity=30, unit_cost=42, created_at=datetime.utcnow())
+    sm1 = StockMovement(product_id=p1.id, shelf_id=sh1.id, direction="in", reason="purchase", quantity=50, unit_cost=35, created_at=datetime.now())
+    sm2 = StockMovement(product_id=p2.id, shelf_id=sh1.id, direction="in", reason="purchase", quantity=30, unit_cost=42, created_at=datetime.now())
     db.add_all([sm1, sm2])
-    txn1 = Transaction(supplier_id=s1.id, category="purchase", amount=50*35+30*42, created_at=datetime.utcnow())
+    txn1 = Transaction(supplier_id=s1.id, category="purchase", amount=50*35+30*42, created_at=datetime.now())
     db.add(txn1)
     db.commit()
 
@@ -47,14 +47,14 @@ try:
     db.add(d1)
     db.flush()
 
-    sm3 = StockMovement(product_id=p1.id, shelf_id=sh2.id, direction="out", reason="sale", quantity=10, delivery_id=d1.id, created_at=datetime.utcnow())
-    sm4 = StockMovement(product_id=p2.id, shelf_id=sh2.id, direction="out", reason="sale", quantity=5, delivery_id=d1.id, created_at=datetime.utcnow())
+    sm3 = StockMovement(product_id=p1.id, shelf_id=sh2.id, direction="out", reason="sale", quantity=10, delivery_id=d1.id, created_at=datetime.now())
+    sm4 = StockMovement(product_id=p2.id, shelf_id=sh2.id, direction="out", reason="sale", quantity=5, delivery_id=d1.id, created_at=datetime.now())
     db.add_all([sm3, sm4])
-    txn2 = Transaction(customer_id=c1.id, category="sale", amount=10*38+5*48, delivery_id=d1.id, created_at=datetime.utcnow())
+    txn2 = Transaction(customer_id=c1.id, category="sale", amount=10*38+5*48, delivery_id=d1.id, created_at=datetime.now())
     db.add(txn2)
 
     # Partial payment
-    txn3 = Transaction(customer_id=c1.id, category="payment", amount=300, delivery_id=d1.id, created_at=datetime.utcnow())
+    txn3 = Transaction(customer_id=c1.id, category="payment", amount=300, delivery_id=d1.id, created_at=datetime.now())
     db.add(txn3)
     db.commit()
 

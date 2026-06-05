@@ -148,7 +148,7 @@ class PurchaseService:
                 )
 
             order.status = "cancelled"
-            order.updated_at = datetime.utcnow()
+            order.updated_at = datetime.now()
             self.db.commit()
             return {"id": order.id, "status": "cancelled"}
 
@@ -305,7 +305,7 @@ class PurchaseService:
                     "direction": "in", "reason": "purchase",
                     "quantity": qty, "unit_cost": cost,
                     "purchase_order_id": order.id,
-                    "created_at": datetime.utcnow() if not date_str else datetime.strptime(date_str, "%Y-%m-%d"),
+                    "created_at": datetime.now() if not date_str else datetime.strptime(date_str, "%Y-%m-%d"),
                 })
 
             if movements:

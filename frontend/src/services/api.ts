@@ -28,6 +28,8 @@ export const customerApi = {
   addPrice: (customerId: number, productId: number, price: number) =>
     api.post(`/customers/${customerId}/prices?product_id=${productId}&price=${price}`).then(r => r.data),
   deletePrice: (customerId: number, priceId: number) => api.delete(`/customers/${customerId}/prices/${priceId}`),
+  resolvePrice: (customerId: number, productId: number) =>
+    api.get(`/customers/${customerId}/resolve-price`, { params: { product_id: productId } }).then(r => r.data),
   importFile: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);

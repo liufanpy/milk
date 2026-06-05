@@ -11,4 +11,4 @@ class OperationLog(Base):
     entity_type = Column(String(50), nullable=False)
     entity_id = Column(Integer, nullable=True)
     changes = Column(Text, default="{}")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)

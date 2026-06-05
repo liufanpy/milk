@@ -3,6 +3,8 @@ from app.repositories.customer_repo import CustomerRepository
 from app.repositories.product_customer_price_repo import ProductCustomerPriceRepository
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.services.csv_importer import parse_csv
+from app.models.product_customer_price import ProductCustomerPrice
+from app.models.product import Product
 
 CUSTOMER_HEADERS = [
     "name", "名称", "phone", "电话", "contact", "联系人", "address", "地址",
@@ -39,6 +41,30 @@ class CustomerService:
 
     def delete_price(self, price_id: int):
         return self.price_repo.delete(price_id)
+
+    def resolve_product_price(self, customer_id: int, product_id: int) -> dict:
+        product = self.db.query(Product).filter(Product.id == product_id).first()
+        if not product:
+            raise ValueError("产品不存在")
+
+        # 1. 客户专属价
+        if customer_id:
+            custom = (
+                self.db.query(ProductCustomerPrice)
+                .filter(ProductCustomerPrice.customer_id == customer_id, ProductCustomerPrice.product_id == product_id)
+                .first()
+            )
+            if custom:
+                return {"price": custom.price, "source": "专属价"}
+
+        # 2. 客户等级价
+        if customer_id:
+            customer = self.repo.get_by_id(customer_id)
+            if customer and customer.price_tier == "批发":
+                return {"price": product.default_wholesale_price, "source": "批发价"}
+
+        # 3. 默认零售价
+        return {"price": product.default_retail_price, "source": "零售价"}
 
     def export_csv(self) -> str:
         customers = self.repo.get_all(limit=10000)

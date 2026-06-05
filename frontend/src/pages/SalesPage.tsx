@@ -31,6 +31,16 @@ export default function SalesPage() {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
   };
   const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+
+  const onProductChange = async (idx: number, productId: number) => {
+    updateItem(idx, 'product_id', productId);
+    if (productId) {
+      try {
+        const { price } = await customerApi.resolvePrice(customerId ? Number(customerId) : 0, productId);
+        updateItem(idx, 'unit_price', price);
+      } catch {}
+    }
+  };
   const removeRow = (idx: number) => setItems(items.filter((_, i) => i !== idx));
 
   const handleSubmit = async () => {
@@ -66,7 +76,7 @@ export default function SalesPage() {
           <div key={idx} className="flex gap-2 items-end">
             <div className="flex-1">
               <label className="text-xs text-gray-500">产品</label>
-              <ProductSelect value={item.product_id} onChange={(v) => updateItem(idx, 'product_id', v)} />
+              <ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} />
             </div>
             <div className="w-20">
               <label className="text-xs text-gray-500">数量</label>

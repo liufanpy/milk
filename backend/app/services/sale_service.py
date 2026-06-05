@@ -23,7 +23,7 @@ class SaleService:
                 "direction": "out",
                 "reason": "sale",
                 "quantity": item.quantity,
-                "unit_cost": 0.0,
+                "unit_cost": item.unit_price,
             })
 
         self.stock_repo.bulk_create(movements)

@@ -14,4 +14,4 @@ class Transaction(Base):
     delivery_id = Column(Integer, ForeignKey("deliveries.id"), nullable=True)
     purchase_order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)
     note = Column(String(500), default="")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)

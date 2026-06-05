@@ -66,6 +66,15 @@ def delete_customer_price(customer_id: int, price_id: int, svc: CustomerService 
     svc.delete_price(price_id)
 
 
+@router.get("/{customer_id}/resolve-price")
+def resolve_product_price(customer_id: int, product_id: int, svc: CustomerService = Depends(get_customer_service)):
+    try:
+        return svc.resolve_product_price(customer_id, product_id)
+    except ValueError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.post("/import")
 async def import_customers(file: UploadFile = File(...), svc: CustomerService = Depends(get_customer_service)):
     content = await file.read()

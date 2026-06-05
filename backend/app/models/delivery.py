@@ -12,4 +12,4 @@ class Delivery(Base):
     status = Column(String(20), default="pending")
     subscription_order_id = Column(Integer, ForeignKey("subscription_orders.id"), nullable=True)
     note = Column(String(500), default="")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)

@@ -13,5 +13,5 @@ class PurchaseOrder(Base):
     total_amount = Column(Float, nullable=False, default=0.0)
     note = Column(String(500), default="")
     status = Column(String(20), nullable=False, default="draft")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

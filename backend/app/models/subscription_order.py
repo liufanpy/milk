@@ -14,4 +14,4 @@ class SubscriptionOrder(Base):
     free_bottles = Column(Integer, default=0)
     remaining_bottles = Column(Integer, nullable=False)
     status = Column(String(20), default="active")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)

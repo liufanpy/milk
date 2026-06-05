@@ -54,6 +54,16 @@ export default function DeliveriesPage() {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
   const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
 
+  const onProductChange = async (idx: number, productId: number) => {
+    updateItem(idx, 'product_id', productId);
+    if (productId) {
+      try {
+        const { price } = await customerApi.resolvePrice(customerId ? Number(customerId) : 0, productId);
+        updateItem(idx, 'unit_price', price);
+      } catch {}
+    }
+  };
+
   const handleCreate = async () => {
     if (!customerId || items.some(i => !i.product_id || !i.shelf_id || !i.quantity)) {
       alert('请填写完整信息'); return;
@@ -91,6 +101,28 @@ export default function DeliveriesPage() {
     const detail = await deliveryApi.get(selectedDelivery.id);
     setSelectedDelivery(detail);
     refetch();
+  };
+
+  const exchangeCustomerId = selectedDelivery?.customer_id;
+
+  const onReturnProductChange = async (idx: number, productId: number) => {
+    setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: productId } : it));
+    if (exchangeCustomerId && productId) {
+      try {
+        const { price } = await customerApi.resolvePrice(exchangeCustomerId, productId);
+        setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: price } : it));
+      } catch {}
+    }
+  };
+
+  const onNewProductChange = async (idx: number, productId: number) => {
+    setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: productId } : it));
+    if (exchangeCustomerId && productId) {
+      try {
+        const { price } = await customerApi.resolvePrice(exchangeCustomerId, productId);
+        setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: price } : it));
+      } catch {}
+    }
   };
 
   const handleExchange = async () => {
@@ -138,7 +170,7 @@ export default function DeliveriesPage() {
         </div>
         {items.map((item, idx) => (
           <div key={idx} className="flex gap-2 items-end">
-            <div className="flex-1"><label className="text-xs text-gray-500">产品</label><ProductSelect value={item.product_id} onChange={(v) => updateItem(idx, 'product_id', v)} /></div>
+            <div className="flex-1"><label className="text-xs text-gray-500">产品</label><ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} /></div>
             <div className="w-20"><label className="text-xs text-gray-500">数量</label><Input type="number" value={String(item.quantity)} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} /></div>
             <div className="w-24"><label className="text-xs text-gray-500">售价</label><Input type="number" value={String(item.unit_price)} onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))} /></div>
             <div className="flex-1">
@@ -244,7 +276,7 @@ export default function DeliveriesPage() {
             <h4 className="text-sm font-medium mb-2">退回品项</h4>
             {returnItems.map((item, idx) => (
               <div key={idx} className="flex gap-2 mb-2">
-                <ProductSelect value={item.product_id} onChange={(v) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: v } : it))} />
+                <ProductSelect value={item.product_id} onChange={(v) => onReturnProductChange(idx, v)} />
                 <Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" />
                 <Input type="number" placeholder="单价" value={String(item.unit_price)} onChange={(e) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: Number(e.target.value) } : it))} className="w-24" />
                 <Button variant="danger" size="sm" onClick={() => setReturnItems(returnItems.filter((_, i) => i !== idx))} disabled={returnItems.length <= 1}>×</Button>
@@ -256,7 +288,7 @@ export default function DeliveriesPage() {
             <h4 className="text-sm font-medium mb-2">新品项</h4>
             {newItems.map((item, idx) => (
               <div key={idx} className="flex gap-2 mb-2">
-                <ProductSelect value={item.product_id} onChange={(v) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: v } : it))} />
+                <ProductSelect value={item.product_id} onChange={(v) => onNewProductChange(idx, v)} />
                 <Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" />
                 <Input type="number" placeholder="单价" value={String(item.unit_price)} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: Number(e.target.value) } : it))} className="w-24" />
                 <Button variant="danger" size="sm" onClick={() => setNewItems(newItems.filter((_, i) => i !== idx))} disabled={newItems.length <= 1}>×</Button>

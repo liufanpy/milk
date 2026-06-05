@@ -19,6 +19,7 @@ class ReturnService:
                 "direction": "in",
                 "reason": "return",
                 "quantity": item.quantity,
+                "unit_cost": item.unit_price,
                 "delivery_id": data.delivery_id,
             }])
             if item.is_wasted:
@@ -28,6 +29,7 @@ class ReturnService:
                     "direction": "out",
                     "reason": "wastage",
                     "quantity": item.quantity,
+                    "unit_cost": item.unit_price,
                 }])
             refund_total += item.quantity * item.unit_price
 
