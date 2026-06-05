@@ -313,7 +313,7 @@ class PurchaseService:
                     "direction": "in", "reason": "purchase",
                     "quantity": qty, "unit_price": cost,
                     "purchase_order_id": order.id,
-                    "created_at": datetime.now() if not date_str else datetime.combine(item_date, datetime.min.time()),
+                    "created_at": datetime.now(),
                 })
 
             if movements:
