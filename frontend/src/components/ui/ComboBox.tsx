@@ -68,13 +68,17 @@ export function ComboBox({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex((prev) => (prev + 1) % filtered.length);
+        if (filtered.length > 0) {
+          setHighlightedIndex((prev) => (prev + 1) % filtered.length);
+        }
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setHighlightedIndex(
-          (prev) => (prev - 1 + filtered.length) % filtered.length,
-        );
+        if (filtered.length > 0) {
+          setHighlightedIndex(
+            (prev) => (prev - 1 + filtered.length) % filtered.length,
+          );
+        }
         break;
       case 'Enter':
         e.preventDefault();
