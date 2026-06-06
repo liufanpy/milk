@@ -10,6 +10,7 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 import CsvImportModal from '../components/business/CsvImportModal';
+import { ProductSelect } from '../components/business/ProductSelect';
 import { customerApi } from '../services/api';
 import { Table } from '../components/ui/Table';
 import type { Customer, CreateCustomerData, ProductCustomerPrice } from '../types';
@@ -103,8 +104,6 @@ export default function CustomersPage() {
     },
   ];
 
-  const productOptions = products.map((p: any) => ({ value: p.id, label: `${p.name} (${p.brand})` }));
-
   const productMap = Object.fromEntries(products.map((p: any) => [p.id, p]));
 
   return (
@@ -157,11 +156,9 @@ export default function CustomersPage() {
           )}
           <div className="border-t pt-3 space-y-3">
             <p className="text-sm font-medium text-gray-600">新增价格</p>
-            <Select
-              label="产品"
-              options={productOptions}
+            <ProductSelect
               value={priceForm.product_id}
-              onChange={(e) => setPriceForm({ ...priceForm, product_id: e.target.value })}
+              onChange={(v) => setPriceForm({ ...priceForm, product_id: String(v) })}
             />
             <Input label="价格" type="number" value={priceForm.price} onChange={(e) => setPriceForm({ ...priceForm, price: e.target.value })} />
             <Button onClick={handleAddPrice} disabled={!priceForm.product_id || !priceForm.price}>添加</Button>
