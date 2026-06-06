@@ -1,18 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { dashboardApi, productApi, shelfApi, customerApi } from '../services/api';
+import { dashboardApi, productApi, customerApi } from '../services/api';
 import { Badge } from '../components/ui/Badge';
 
 export default function DashboardPage() {
   const { data, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get });
   const { data: receivables = [] } = useQuery({ queryKey: ['receivables'], queryFn: dashboardApi.getReceivables });
   const [productNames, setProductNames] = useState<Record<number, string>>({});
-  const [shelfNames, setShelfNames] = useState<Record<number, string>>({});
   const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
 
   useEffect(() => {
     productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
-    shelfApi.list().then((data: any) => setShelfNames(Object.fromEntries(data.map((s: any) => [s.id, s.name]))));
     customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
   }, []);
 
@@ -42,7 +40,7 @@ export default function DashboardPage() {
           {data?.low_stock?.length === 0 ? <p className="text-gray-400 text-sm">无预警</p> : (
             data?.low_stock?.map((item: any, i: number) => (
               <div key={i} className="flex justify-between text-sm py-1 border-b">
-                <span>{productNames[item.product_id] || `产品#${item.product_id}`} {shelfNames[item.shelf_id] || `货架#${item.shelf_id}`}</span>
+                <span>{productNames[item.product_id] || `产品#${item.product_id}`}</span>
                 <Badge variant="warning">{item.stock}</Badge>
               </div>
             ))

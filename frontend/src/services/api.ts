@@ -48,16 +48,6 @@ export const supplierApi = {
   confirmImport: (rows: any[]) => api.post('/suppliers/import/confirm', { rows }).then(r => r.data),
 };
 
-// Shelves
-export const shelfApi = {
-  list: () => api.get('/shelves').then(r => r.data),
-  create: (data: any) => api.post('/shelves', data).then(r => r.data),
-  update: (id: number, data: any) => api.put(`/shelves/${id}`, data).then(r => r.data),
-  delete: (id: number) => api.delete(`/shelves/${id}`),
-  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/shelves/import', fd).then(r => r.data); },
-  confirmImport: (rows: any[]) => api.post('/shelves/import/confirm', { rows }).then(r => r.data),
-};
-
 // Purchases
 export const purchaseApi = {
   create: (data: any) => api.post('/purchases', data).then(r => r.data),
@@ -96,11 +86,17 @@ export const wastageApi = {
   list: () => api.get('/wastage').then(r => r.data),
 };
 
+// Inventory
+export const inventoryApi = {
+  list: () => api.get('/inventory').then(r => r.data),
+};
+
 // Subscription
 export const subscriptionApi = {
   create: (data: any) => api.post('/subscription-orders', data).then(r => r.data),
   deduct: (id: number, data: any) => api.post(`/subscription-orders/${id}/deduct`, data).then(r => r.data),
   list: () => api.get('/subscription-orders').then(r => r.data),
+  get: (id: number) => api.get(`/subscription-orders/${id}`).then(r => r.data),
 };
 
 // Dashboard & queries

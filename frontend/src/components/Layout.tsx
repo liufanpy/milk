@@ -6,7 +6,6 @@ const navItems = [
   { to: '/products', label: '产品' },
   { to: '/customers', label: '客户' },
   { to: '/suppliers', label: '供应商' },
-  { to: '/shelves', label: '货架' },
   { to: '/purchases', label: '进货' },
   { to: '/sales', label: '销售' },
   { to: '/deliveries', label: '送货单' },

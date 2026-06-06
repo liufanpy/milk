@@ -6,23 +6,22 @@ import { Badge } from '../components/ui/Badge';
 import { ProductSelect } from '../components/business/ProductSelect';
 import { CustomerSelect } from '../components/business/CustomerSelect';
 import { useDeliveries, useCreateDelivery, useSettleDelivery, useExchangeDelivery } from '../hooks/useDeliveries';
-import { deliveryApi, shelfApi, customerApi, productApi } from '../services/api';
+import { deliveryApi, customerApi, productApi } from '../services/api';
 
 interface DeliveryItem {
   product_id: number;
   quantity: number;
   unit_price: number;
-  shelf_id: number;
+  is_promo: boolean;
 }
 
 export default function DeliveriesPage() {
   // Create state
   const [customerId, setCustomerId] = useState<number | string>('');
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
-  const [items, setItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+  const [items, setItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
   const [paid, setPaid] = useState(false);
   const [note, setNote] = useState('');
-  const [shelves, setShelves] = useState<any[]>([]);
   const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
   const [productNames, setProductNames] = useState<Record<number, string>>({});
 
@@ -40,19 +39,18 @@ export default function DeliveriesPage() {
   const [settleAmount, setSettleAmount] = useState(0);
   const [settleOpen, setSettleOpen] = useState(false);
   const [exchangeOpen, setExchangeOpen] = useState(false);
-  const [returnItems, setReturnItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
-  const [newItems, setNewItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+  const [returnItems, setReturnItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
+  const [newItems, setNewItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
 
   useEffect(() => {
-    shelfApi.list().then(setShelves);
     customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
     productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
   }, []);
 
   // Create helpers
-  const updateItem = (idx: number, field: keyof DeliveryItem, value: number) =>
+  const updateItem = (idx: number, field: keyof DeliveryItem, value: number | boolean) =>
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
-  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
 
   const onProductChange = async (idx: number, productId: number) => {
     updateItem(idx, 'product_id', productId);
@@ -65,7 +63,7 @@ export default function DeliveriesPage() {
   };
 
   const handleCreate = async () => {
-    if (!customerId || items.some(i => !i.product_id || !i.shelf_id || !i.quantity)) {
+    if (!customerId || items.some(i => !i.product_id || !i.quantity)) {
       alert('请填写完整信息'); return;
     }
     try {
@@ -77,7 +75,7 @@ export default function DeliveriesPage() {
         note,
       });
       alert('送货单创建成功');
-      setCustomerId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]); setNote('');
+      setCustomerId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]); setNote('');
       refetch();
     } catch (err: any) {
       alert(err?.response?.data?.detail || '创建失败');
@@ -136,8 +134,8 @@ export default function DeliveriesPage() {
       return;
     }
 
-    if (returnItems.some(i => !i.product_id || !i.shelf_id || !i.quantity) ||
-        newItems.some(i => !i.product_id || !i.shelf_id || !i.quantity)) {
+    if (returnItems.some(i => !i.product_id || !i.quantity) ||
+        newItems.some(i => !i.product_id || !i.quantity)) {
       alert('请填写完整信息');
       return;
     }
@@ -149,8 +147,8 @@ export default function DeliveriesPage() {
       });
       alert('换货成功');
       setExchangeOpen(false);
-      setReturnItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
-      setNewItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+      setReturnItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
+      setNewItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
       const detail = await deliveryApi.get(selectedDelivery.id);
       setSelectedDelivery(detail);
       refetch();
@@ -188,13 +186,10 @@ export default function DeliveriesPage() {
             <div className="flex-1"><label className="text-xs text-gray-500">产品</label><ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} onlyInStock /></div>
             <div className="w-20"><label className="text-xs text-gray-500">数量</label><Input type="number" value={String(item.quantity)} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} /></div>
             <div className="w-24"><label className="text-xs text-gray-500">售价</label><Input type="number" value={String(item.unit_price)} onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))} /></div>
-            <div className="flex-1">
-              <label className="text-xs text-gray-500">货架</label>
-              <select value={item.shelf_id} onChange={(e) => updateItem(idx, 'shelf_id', Number(e.target.value))} className="w-full border rounded px-2 py-1 text-sm">
-                <option value="">选货架</option>
-                {shelves.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
+            <label className="flex items-center gap-1 text-xs pb-2">
+              <input type="checkbox" checked={item.is_promo} onChange={(e) => updateItem(idx, 'is_promo', e.target.checked)} />
+              赠送
+            </label>
             <Button variant="danger" size="sm" onClick={() => setItems(items.filter((_, i) => i !== idx))} disabled={items.length <= 1}>×</Button>
           </div>
         ))}
@@ -327,14 +322,10 @@ export default function DeliveriesPage() {
                 <ProductSelect value={item.product_id} onChange={(v) => onReturnProductChange(idx, v)} />
                 <Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" />
                 <Input type="number" placeholder="单价" value={String(item.unit_price)} onChange={(e) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: Number(e.target.value) } : it))} className="w-24" />
-                <select value={item.shelf_id} onChange={(e) => setReturnItems(prev => prev.map((it, i) => i === idx ? { ...it, shelf_id: Number(e.target.value) } : it))} className="w-24 border rounded px-2 py-1 text-sm">
-                  <option value="">选货架</option>
-                  {shelves.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
                 <Button variant="danger" size="sm" onClick={() => setReturnItems(returnItems.filter((_, i) => i !== idx))} disabled={returnItems.length <= 1}>×</Button>
               </div>
             ))}
-            <Button variant="secondary" size="sm" onClick={() => setReturnItems([...returnItems, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }])}>+</Button>
+            <Button variant="secondary" size="sm" onClick={() => setReturnItems([...returnItems, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }])}>+</Button>
           </div>
           <div>
             <h4 className="text-sm font-medium mb-2">新品项</h4>
@@ -343,14 +334,10 @@ export default function DeliveriesPage() {
                 <ProductSelect value={item.product_id} onChange={(v) => onNewProductChange(idx, v)} onlyInStock />
                 <Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))} className="w-20" />
                 <Input type="number" placeholder="单价" value={String(item.unit_price)} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: Number(e.target.value) } : it))} className="w-24" />
-                <select value={item.shelf_id} onChange={(e) => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, shelf_id: Number(e.target.value) } : it))} className="w-24 border rounded px-2 py-1 text-sm">
-                  <option value="">选货架</option>
-                  {shelves.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
                 <Button variant="danger" size="sm" onClick={() => setNewItems(newItems.filter((_, i) => i !== idx))} disabled={newItems.length <= 1}>×</Button>
               </div>
             ))}
-            <Button variant="secondary" size="sm" onClick={() => setNewItems([...newItems, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }])}>+</Button>
+            <Button variant="secondary" size="sm" onClick={() => setNewItems([...newItems, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }])}>+</Button>
           </div>
           <div className="text-sm text-gray-500 pt-2 border-t">
             <div>退回合计: ¥{returnTotal.toFixed(2)}</div>

@@ -3,34 +3,32 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ProductSelect } from '../components/business/ProductSelect';
 import { CustomerSelect } from '../components/business/CustomerSelect';
-import { saleApi, shelfApi, customerApi } from '../services/api';
+import { saleApi, customerApi } from '../services/api';
 
 interface ItemRow {
   product_id: number;
   quantity: number;
   unit_price: number;
-  shelf_id: number;
+  is_promo: boolean;
 }
 
 export default function SalesPage() {
   const [customerId, setCustomerId] = useState<number | string>('');
-  const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+  const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
   const [paid, setPaid] = useState(true);
-  const [shelves, setShelves] = useState<any[]>([]);
   const [note, setNote] = useState('');
   const [sales, setSales] = useState<any[]>([]);
   const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    shelfApi.list().then(setShelves);
     saleApi.list().then(setSales);
     customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
   }, []);
 
-  const updateItem = (idx: number, field: keyof ItemRow, value: number) => {
+  const updateItem = (idx: number, field: keyof ItemRow, value: number | boolean) => {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
   };
-  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
 
   const onProductChange = async (idx: number, productId: number) => {
     updateItem(idx, 'product_id', productId);
@@ -44,7 +42,7 @@ export default function SalesPage() {
   const removeRow = (idx: number) => setItems(items.filter((_, i) => i !== idx));
 
   const handleSubmit = async () => {
-    if (items.some(i => !i.product_id || !i.shelf_id || !i.quantity)) {
+    if (items.some(i => !i.product_id || !i.quantity)) {
       alert('请填写完整信息');
       return;
     }
@@ -56,7 +54,7 @@ export default function SalesPage() {
     });
     alert('销售成功');
     setCustomerId('');
-    setItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+    setItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
     setPaid(true);
     setNote('');
     saleApi.list().then(setSales);
@@ -86,13 +84,10 @@ export default function SalesPage() {
               <label className="text-xs text-gray-500">售价</label>
               <Input type="number" value={String(item.unit_price)} onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))} />
             </div>
-            <div className="flex-1">
-              <label className="text-xs text-gray-500">货架</label>
-              <select value={item.shelf_id} onChange={(e) => updateItem(idx, 'shelf_id', Number(e.target.value))} className="w-full border rounded px-2 py-1 text-sm">
-                <option value="">选货架</option>
-                {shelves.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
+            <label className="flex items-center gap-1 text-xs pb-2">
+              <input type="checkbox" checked={item.is_promo} onChange={(e) => updateItem(idx, 'is_promo', e.target.checked)} />
+              赠送
+            </label>
             <Button variant="danger" size="sm" onClick={() => removeRow(idx)} disabled={items.length <= 1}>×</Button>
           </div>
         ))}

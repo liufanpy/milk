@@ -5,14 +5,13 @@ import { ProductSelect } from '../components/business/ProductSelect';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 import CsvImportModal from '../components/business/CsvImportModal';
-import { purchaseApi, supplierApi, shelfApi, productApi } from '../services/api';
+import { purchaseApi, supplierApi, productApi } from '../services/api';
 import type { PurchaseOrder, PurchaseOrderDetail } from '../types';
 
 interface ItemRow {
   product_id: number;
   quantity: number;
   unit_price: number;
-  shelf_id: number;
 }
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'danger'> = {
@@ -30,14 +29,11 @@ export default function PurchasesPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [supplierId, setSupplierId] = useState<number | string>('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0, 10));
-  const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+  const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [shelves, setShelves] = useState<any[]>([]);
   const [note, setNote] = useState('');
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [productNames, setProductNames] = useState<Record<number, string>>({});
-  const [shelfNames, setShelfNames] = useState<Record<number, string>>({});
 
   // 详情弹窗
   const [detailOpen, setDetailOpen] = useState(false);
@@ -45,10 +41,8 @@ export default function PurchasesPage() {
 
   useEffect(() => {
     supplierApi.list().then(setSuppliers);
-    shelfApi.list().then((data: any) => { setShelves(data); setShelfNames(Object.fromEntries(data.map((s: any) => [s.id, s.name]))); });
     productApi.list().then((data: any) => {
       setProducts(data);
-      setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name])));
     });
     purchaseApi.list().then(setOrders);
   }, []);
@@ -59,7 +53,7 @@ export default function PurchasesPage() {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
   };
 
-  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0 }]);
   const removeRow = (idx: number) => setItems(items.filter((_, i) => i !== idx));
 
   const onProductChange = (idx: number, productId: number) => {
@@ -75,12 +69,12 @@ export default function PurchasesPage() {
   const resetForm = () => {
     setSupplierId('');
     setPurchaseDate(new Date().toISOString().slice(0, 10));
-    setItems([{ product_id: 0, quantity: 1, unit_price: 0, shelf_id: 0 }]);
+    setItems([{ product_id: 0, quantity: 1, unit_price: 0 }]);
     setNote('');
   };
 
   const handleSubmit = async (status: 'draft' | 'confirmed') => {
-    if (!supplierId || !purchaseDate || items.some(i => !i.product_id || !i.shelf_id || !i.quantity)) {
+    if (!supplierId || !purchaseDate || items.some(i => !i.product_id || !i.quantity)) {
       alert('请填写完整信息');
       return;
     }
@@ -153,13 +147,6 @@ export default function PurchasesPage() {
             <div className="w-24">
               <label className="text-xs text-gray-500">单价</label>
               <Input type="number" value={String(item.unit_price)} onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))} />
-            </div>
-            <div className="flex-1">
-              <label className="text-xs text-gray-500">货架</label>
-              <select value={item.shelf_id} onChange={(e) => updateItem(idx, 'shelf_id', Number(e.target.value))} className="w-full border rounded px-2 py-1 text-sm">
-                <option value="">选货架</option>
-                {shelves.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
             </div>
             <Button variant="danger" size="sm" onClick={() => removeRow(idx)} disabled={items.length <= 1}>×</Button>
           </div>
@@ -238,7 +225,6 @@ export default function PurchasesPage() {
                   <th className="px-2 py-1 text-right">数量</th>
                   <th className="px-2 py-1 text-right">进价</th>
                   <th className="px-2 py-1 text-right">小计</th>
-                  <th className="px-2 py-1 text-left">货架</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,7 +234,6 @@ export default function PurchasesPage() {
                     <td className="px-2 py-1 text-right">{it.quantity}</td>
                     <td className="px-2 py-1 text-right">¥{it.unit_price.toFixed(2)}</td>
                     <td className="px-2 py-1 text-right">¥{(it.quantity * it.unit_price).toFixed(2)}</td>
-                    <td className="px-2 py-1">{it.shelf_name}</td>
                   </tr>
                 ))}
               </tbody>

@@ -29,12 +29,6 @@ export interface Supplier {
   phone: string;
 }
 
-export interface Shelf {
-  id: number;
-  name: string;
-  customer_id: number | null;
-}
-
 export interface Delivery {
   id: number;
   customer_id: number;
@@ -65,19 +59,20 @@ export interface Transaction {
 export interface StockMovement {
   id: number;
   product_id: number;
-  shelf_id: number;
   direction: string;
   reason: string;
   quantity: number;
+  unit_price?: number;
 }
 
 export interface SubscriptionOrder {
   id: number;
   customer_id: number;
-  total_amount: number;
-  total_bottles: number;
-  remaining_bottles: number;
+  paid_amount: number;
+  remaining_amount: number;
+  note: string;
   status: string;
+  created_at: string;
 }
 
 export interface ProductCustomerPrice {
@@ -108,25 +103,24 @@ export interface CreateCustomerData {
   default_payment?: string;
 }
 
-export interface PurchaseItem {
-  product_id: number;
-  quantity: number;
-  unit_price: number;
-  shelf_id: number;
-}
-
 export interface SaleItem {
   product_id: number;
   quantity: number;
   unit_price: number;
-  shelf_id: number;
+  is_promo?: boolean;
 }
 
 export interface DeliveryCreateItem {
   product_id: number;
   quantity: number;
   unit_price: number;
-  shelf_id: number;
+  is_promo?: boolean;
+}
+
+export interface PurchaseItem {
+  product_id: number;
+  quantity: number;
+  unit_price: number;
 }
 
 export interface PurchaseOrder {
@@ -150,6 +144,4 @@ export interface PurchaseOrderDetailItem {
   product_name: string;
   quantity: number;
   unit_price: number;
-  shelf_id: number;
-  shelf_name: string;
 }
