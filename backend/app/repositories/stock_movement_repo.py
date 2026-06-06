@@ -24,6 +24,12 @@ class StockMovementRepository:
             StockMovement.purchase_order_id == purchase_order_id
         ).all()
 
+    def get_by_retail_order(self, retail_order_id: int) -> List[StockMovement]:
+        return self.db.query(StockMovement).filter(
+            StockMovement.retail_order_id == retail_order_id,
+            StockMovement.reason == "retail",
+        ).all()
+
     def get_by_subscription_order(self, subscription_order_id: int) -> List[StockMovement]:
         return self.db.query(StockMovement).filter(
             StockMovement.subscription_order_id == subscription_order_id

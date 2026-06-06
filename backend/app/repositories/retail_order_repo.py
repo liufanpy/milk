@@ -11,3 +11,11 @@ class RetailOrderRepository:
         self.db.add(order)
         self.db.flush()
         return order
+
+    def get_by_id(self, order_id: int) -> RetailOrder | None:
+        return self.db.query(RetailOrder).filter(RetailOrder.id == order_id).first()
+
+    def update_status(self, order_id: int, status: str):
+        order = self.get_by_id(order_id)
+        if order:
+            order.status = status
