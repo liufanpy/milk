@@ -8,7 +8,6 @@ class StockMovement(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    shelf_id = Column(Integer, ForeignKey("shelves.id"), nullable=False)
     direction = Column(String(10), nullable=False)
     reason = Column(String(30), nullable=False)
     quantity = Column(Integer, nullable=False)
