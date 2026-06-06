@@ -26,7 +26,7 @@ def get_dashboard(db: Session = Depends(get_db)):
     today = date.today()
 
     today_sales = db.query(func.sum(Transaction.amount)).filter(
-        Transaction.category.in_(["sale", "delivery", "delivery_cancel"]),
+        Transaction.category.in_(["retail", "subscription", "distribution", "sale", "delivery", "delivery_cancel"]),
         func.date(Transaction.created_at) == today,
     ).scalar() or 0.0
 
@@ -43,7 +43,7 @@ def get_dashboard(db: Session = Depends(get_db)):
     stock_repo = StockMovementRepository(db)
     inventory_rows = stock_repo.get_inventory()
     low_stock = [
-        {"product_id": r.product_id, "shelf_id": r.shelf_id, "stock": r.stock}
+        {"product_id": r.product_id, "stock": r.stock}
         for r in inventory_rows if 0 < r.stock < 10
     ]
 
