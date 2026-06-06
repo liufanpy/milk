@@ -6,7 +6,6 @@ class ReturnItem(BaseModel):
     product_id: int
     quantity: int
     unit_price: float
-    shelf_id: int
     is_wasted: bool = False
 
 

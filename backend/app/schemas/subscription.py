@@ -1,20 +1,20 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class SubscriptionCreate(BaseModel):
     customer_id: int
-    total_amount: float
-    total_bottles: int
-    paid_bottles: int = 0
-    free_bottles: int = 0
+    paid_amount: float
+    is_paid: bool = True
+    note: str = ""
 
 
 class SubscriptionDeductItem(BaseModel):
     product_id: int
     quantity: int
+    unit_price: Optional[float] = None
+    is_promo: bool = False
 
 
 class SubscriptionDeduct(BaseModel):
     items: List[SubscriptionDeductItem]
-    shelf_id: int

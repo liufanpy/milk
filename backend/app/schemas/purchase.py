@@ -7,7 +7,6 @@ class PurchaseItem(BaseModel):
     product_id: int
     quantity: int
     unit_price: float
-    shelf_id: int
 
 
 class PurchaseCreate(BaseModel):

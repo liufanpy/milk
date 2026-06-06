@@ -3,19 +3,19 @@ from typing import List, Optional
 from datetime import date
 
 
-class DeliveryItem(BaseModel):
+class DeliveryCreateItem(BaseModel):
     product_id: int
     quantity: int
     unit_price: float
-    shelf_id: int
+    is_promo: bool = False
 
 
 class DeliveryCreate(BaseModel):
     customer_id: int
     delivery_date: date
-    items: List[DeliveryItem]
-    paid: bool = False
+    items: List[DeliveryCreateItem]
     subscription_order_id: Optional[int] = None
+    paid: bool = False
     note: str = ""
 
 
@@ -38,7 +38,6 @@ class ExchangeItem(BaseModel):
     product_id: int
     quantity: int
     unit_price: float
-    shelf_id: int
 
 
 class ExchangeCreate(BaseModel):

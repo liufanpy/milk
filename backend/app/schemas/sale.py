@@ -6,7 +6,7 @@ class SaleItem(BaseModel):
     product_id: int
     quantity: int
     unit_price: float
-    shelf_id: int
+    is_promo: bool = False
 
 
 class SaleCreate(BaseModel):

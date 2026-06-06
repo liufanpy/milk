@@ -1,11 +1,10 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class WastageItem(BaseModel):
     product_id: int
     quantity: int
-    shelf_id: int
     reason: str
 
 
