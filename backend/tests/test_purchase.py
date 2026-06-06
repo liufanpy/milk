@@ -6,14 +6,13 @@ class TestPurchaseCreate:
     def test_create_confirmed_purchase_with_unit_price(self, client, seed_data):
         """确认入库，unit_price 写入 stock_movements"""
         s = seed_data["suppliers"][0]
-        sh = seed_data["shelves"][0]
         p = seed_data["products"][0]
 
         resp = client.post("/api/purchases", json={
             "supplier_id": s.id,
             "purchase_date": "2026-06-05",
             "items": [
-                {"product_id": p.id, "quantity": 10, "unit_price": 35, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 10, "unit_price": 35},
             ],
             "status": "confirmed",
         })
@@ -35,14 +34,13 @@ class TestPurchaseCreate:
     def test_create_draft_purchase(self, client, seed_data):
         """草稿进货单不写库存"""
         s = seed_data["suppliers"][0]
-        sh = seed_data["shelves"][0]
         p = seed_data["products"][0]
 
         resp = client.post("/api/purchases", json={
             "supplier_id": s.id,
             "purchase_date": "2026-06-05",
             "items": [
-                {"product_id": p.id, "quantity": 5, "unit_price": 40, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 5, "unit_price": 40},
             ],
             "status": "draft",
         })
@@ -57,7 +55,6 @@ class TestPurchaseCreate:
     def test_confirm_draft_writes_stock(self, client, seed_data):
         """草稿确认后写库存，unit_price 保留"""
         s = seed_data["suppliers"][0]
-        sh = seed_data["shelves"][0]
         p = seed_data["products"][0]
 
         # 创建草稿
@@ -65,7 +62,7 @@ class TestPurchaseCreate:
             "supplier_id": s.id,
             "purchase_date": "2026-06-05",
             "items": [
-                {"product_id": p.id, "quantity": 3, "unit_price": 36, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 3, "unit_price": 36},
             ],
             "status": "draft",
         })
@@ -74,7 +71,7 @@ class TestPurchaseCreate:
         # 确认草稿（重新传 items）
         client.post(f"/api/purchases/{order_id}/confirm", json={
             "items": [
-                {"product_id": p.id, "quantity": 3, "unit_price": 36, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 3, "unit_price": 36},
             ],
         })
 
@@ -85,7 +82,6 @@ class TestPurchaseCreate:
     def test_cancel_confirmed_purchase_reverses_stock(self, client, seed_data):
         """撤销已确认的进货单，库存反向冲抵"""
         s = seed_data["suppliers"][0]
-        sh = seed_data["shelves"][0]
         p = seed_data["products"][0]
 
         # 创建并确认
@@ -93,7 +89,7 @@ class TestPurchaseCreate:
             "supplier_id": s.id,
             "purchase_date": "2026-06-05",
             "items": [
-                {"product_id": p.id, "quantity": 8, "unit_price": 35, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 8, "unit_price": 35},
             ],
             "status": "confirmed",
         })

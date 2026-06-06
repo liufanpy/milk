@@ -193,7 +193,6 @@ class PurchaseService:
             return None
         items = self.stock_repo.get_by_purchase_order(order_id)
         products = {p.id: p.name for p in self.db.query(Product).all()}
-        shelves = {s.id: s.name for s in self.db.query(Shelf).all()}
         suppliers = {s.id: s.name for s in self.db.query(Supplier).all()}
 
         def item_dir(i):
@@ -202,8 +201,6 @@ class PurchaseService:
                 "product_name": products.get(i.product_id, ""),
                 "quantity": i.quantity,
                 "unit_price": i.unit_price,
-                "shelf_id": i.shelf_id,
-                "shelf_name": shelves.get(i.shelf_id, ""),
             }
 
         return {

@@ -5,7 +5,6 @@ import pytest
 class TestSaleCreate:
     def test_create_sale_with_unit_price(self, client, seed_data):
         """创建零售，传入 unit_price"""
-        sh = seed_data["shelves"][0]
         p = seed_data["products"][0]
 
         # 先入库
@@ -13,7 +12,7 @@ class TestSaleCreate:
             "supplier_id": seed_data["suppliers"][0].id,
             "purchase_date": "2026-06-05",
             "items": [
-                {"product_id": p.id, "quantity": 10, "unit_price": 35, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 10, "unit_price": 35},
             ],
             "status": "confirmed",
         })
@@ -22,7 +21,7 @@ class TestSaleCreate:
         resp = client.post("/api/sales", json={
             "customer_id": seed_data["customers"][0].id,
             "items": [
-                {"product_id": p.id, "quantity": 2, "unit_price": 45, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 2, "unit_price": 45},
             ],
         })
 
@@ -36,7 +35,6 @@ class TestSaleCreate:
 
     def test_create_sale_without_customer(self, client, seed_data):
         """不选客户(散客)也能创建零售"""
-        sh = seed_data["shelves"][0]
         p = seed_data["products"][0]
 
         # 先入库
@@ -44,7 +42,7 @@ class TestSaleCreate:
             "supplier_id": seed_data["suppliers"][0].id,
             "purchase_date": "2026-06-05",
             "items": [
-                {"product_id": p.id, "quantity": 5, "unit_price": 35, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 5, "unit_price": 35},
             ],
             "status": "confirmed",
         })
@@ -52,7 +50,7 @@ class TestSaleCreate:
         resp = client.post("/api/sales", json={
             "customer_id": None,
             "items": [
-                {"product_id": p.id, "quantity": 1, "unit_price": 50, "shelf_id": sh.id},
+                {"product_id": p.id, "quantity": 1, "unit_price": 50},
             ],
         })
 

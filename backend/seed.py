@@ -28,15 +28,9 @@ try:
     db.add(s1)
     db.commit()
 
-    # Shelves
-    sh1 = Shelf(name="仓库A区")
-    sh2 = Shelf(name="门店货架")
-    db.add_all([sh1, sh2])
-    db.commit()
-
     # A purchase (seed stock)
-    sm1 = StockMovement(product_id=p1.id, shelf_id=sh1.id, direction="in", reason="purchase", quantity=50, unit_cost=35, created_at=datetime.now())
-    sm2 = StockMovement(product_id=p2.id, shelf_id=sh1.id, direction="in", reason="purchase", quantity=30, unit_cost=42, created_at=datetime.now())
+    sm1 = StockMovement(product_id=p1.id, direction="in", reason="purchase", quantity=50, unit_price=35, created_at=datetime.now())
+    sm2 = StockMovement(product_id=p2.id, direction="in", reason="purchase", quantity=30, unit_price=42, created_at=datetime.now())
     db.add_all([sm1, sm2])
     txn1 = Transaction(supplier_id=s1.id, category="purchase", amount=50*35+30*42, created_at=datetime.now())
     db.add(txn1)
@@ -47,10 +41,10 @@ try:
     db.add(d1)
     db.flush()
 
-    sm3 = StockMovement(product_id=p1.id, shelf_id=sh2.id, direction="out", reason="sale", quantity=10, delivery_id=d1.id, created_at=datetime.now())
-    sm4 = StockMovement(product_id=p2.id, shelf_id=sh2.id, direction="out", reason="sale", quantity=5, delivery_id=d1.id, created_at=datetime.now())
+    sm3 = StockMovement(product_id=p1.id, direction="out", reason="distribution", quantity=10, delivery_id=d1.id, unit_price=38, created_at=datetime.now())
+    sm4 = StockMovement(product_id=p2.id, direction="out", reason="distribution", quantity=5, delivery_id=d1.id, unit_price=48, created_at=datetime.now())
     db.add_all([sm3, sm4])
-    txn2 = Transaction(customer_id=c1.id, category="sale", amount=10*38+5*48, delivery_id=d1.id, created_at=datetime.now())
+    txn2 = Transaction(customer_id=c1.id, category="distribution", amount=10*38+5*48, delivery_id=d1.id, created_at=datetime.now())
     db.add(txn2)
 
     # Partial payment
@@ -62,7 +56,6 @@ try:
     print(f"  Products: {p1.name}, {p2.name}, {p3.name}")
     print(f"  Customers: {c1.name}, {c2.name}")
     print(f"  Supplier: {s1.name}")
-    print(f"  Shelves: {sh1.name}, {sh2.name}")
     print(f"  Delivery #{d1.id}: {10+5} items, total ¥{10*38+5*48}, paid ¥300")
 
 finally:
