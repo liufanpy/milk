@@ -7,7 +7,6 @@ from app.services.wastage_service import WastageService
 from app.schemas.wastage import WastageCreate
 from app.models.stock_movement import StockMovement
 from app.models.product import Product
-from app.models.shelf import Shelf
 
 router = APIRouter(prefix="/api/wastage", tags=["wastage"])
 

@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.models.product import Product
-from app.models.shelf import Shelf
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
