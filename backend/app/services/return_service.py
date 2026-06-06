@@ -24,7 +24,6 @@ class ReturnService:
             if item.is_wasted:
                 self.stock_repo.bulk_create([{
                     "product_id": item.product_id,
-                    "shelf_id": item.shelf_id,
                     "direction": "out",
                     "reason": "wastage",
                     "quantity": item.quantity,
