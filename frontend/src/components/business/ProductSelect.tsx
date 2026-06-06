@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { productApi, dashboardApi } from '../../services/api';
+import { ComboBox } from '../ui/ComboBox';
 
 interface ProductSelectProps {
   value: number | string;
@@ -24,15 +25,11 @@ export function ProductSelect({ value, onChange, onlyInStock }: ProductSelectPro
     return () => { cancelled = true; };
   }, [onlyInStock]);
   return (
-    <select
+    <ComboBox
       value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-    >
-      <option value="">选产品</option>
-      {products.map((p: any) => (
-        <option key={p.id} value={p.id}>{p.name} ({p.brand})</option>
-      ))}
-    </select>
+      onChange={(v) => onChange(Number(v))}
+      options={products.map((p: any) => ({ value: p.id, label: `${p.name} (${p.brand})` }))}
+      placeholder="选产品"
+    />
   );
 }
