@@ -109,6 +109,7 @@ export function ComboBox({
         <input
           ref={inputRef}
           type="text"
+          autoComplete="off"
           className="flex-1 outline-none bg-transparent"
           placeholder={selectedOption ? selectedOption.label : placeholder}
           value={searchText}
