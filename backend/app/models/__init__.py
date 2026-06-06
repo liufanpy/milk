@@ -9,3 +9,4 @@ from app.models.subscription_order import SubscriptionOrder
 from app.models.product_customer_price import ProductCustomerPrice
 from app.models.operation_log import OperationLog
 from app.models.purchase_order import PurchaseOrder
+from app.models.retail_order import RetailOrder

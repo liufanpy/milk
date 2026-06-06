@@ -13,5 +13,7 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     delivery_id = Column(Integer, ForeignKey("deliveries.id"), nullable=True)
     purchase_order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)
+    subscription_order_id = Column(Integer, ForeignKey("subscription_orders.id"), nullable=True)
+    retail_order_id = Column(Integer, ForeignKey("retail_orders.id"), nullable=True)
     note = Column(String(500), default="")
     created_at = Column(DateTime, default=datetime.now)
