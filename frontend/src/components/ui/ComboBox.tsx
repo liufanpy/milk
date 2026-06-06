@@ -44,6 +44,7 @@ export function ComboBox({
     function handleClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        setSearchText('');
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -96,7 +97,7 @@ export function ComboBox({
     inputRef.current?.focus();
   };
 
-  const hasValue = value !== '' && value !== undefined && value !== 0;
+  const hasValue = value !== '' && value !== undefined;
 
   return (
     <div ref={containerRef} className="relative">
