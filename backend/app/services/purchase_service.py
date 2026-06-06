@@ -99,7 +99,6 @@ class PurchaseService:
             total += qty * cost
             movements.append({
                 "product_id": item["product_id"] if isinstance(item, dict) else item.product_id,
-                "shelf_id": item["shelf_id"] if isinstance(item, dict) else item.shelf_id,
                 "direction": "in",
                 "reason": "purchase",
                 "quantity": qty,
@@ -139,9 +138,8 @@ class PurchaseService:
             for item in original_items:
                 reverses.append({
                     "product_id": item.product_id,
-                    "shelf_id": item.shelf_id,
                     "direction": "out",
-                    "reason": "purchase_cancel",
+                    "reason": "cancel",
                     "quantity": item.quantity,
                     "unit_price": item.unit_price,
                     "purchase_order_id": order_id,
@@ -153,7 +151,7 @@ class PurchaseService:
             if reverse_total > 0:
                 self.txn_repo.create(
                     supplier_id=order.supplier_id,
-                    category="purchase_cancel",
+                    category="purchase",
                     amount=-reverse_total,
                     purchase_order_id=order_id,
                 )
@@ -297,11 +295,6 @@ class PurchaseService:
                     errors.append({"row": data.get("index", "?"), "msg": f"产品'{pname}'不存在"})
                     continue
                 pid, default_cost = p
-                sname = (data.get("货架名称") or data.get("shelf_name") or "").strip() or self.DFLT_SHELF
-                shelf_id = shelves.get(sname)
-                if not shelf_id:
-                    errors.append({"row": data.get("index", "?"), "msg": f"货架'{sname}'不存在"})
-                    continue
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
                 cost = data.get("进价") or data.get("unit_price") or ""
                 cost = float(cost) if cost else default_cost
@@ -309,7 +302,7 @@ class PurchaseService:
                 item_date = _parse_date(date_str) if date_str else date.today()
                 total += qty * cost
                 movements.append({
-                    "product_id": pid, "shelf_id": shelf_id,
+                    "product_id": pid,
                     "direction": "in", "reason": "purchase",
                     "quantity": qty, "unit_price": cost,
                     "purchase_order_id": order.id,

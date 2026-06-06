@@ -49,15 +49,16 @@ class DeliveryService:
         total = 0.0
         movements = []
         for item in data.items:
-            amount = item.quantity * item.unit_price
-            total += amount
+            unit_price = 0.0 if item.is_promo else item.unit_price
+            amount = item.quantity * unit_price
+            if not item.is_promo:
+                total += amount
             movements.append({
                 "product_id": item.product_id,
-                "shelf_id": item.shelf_id,
                 "direction": "out",
-                "reason": "delivery",
+                "reason": "distribution",
                 "quantity": item.quantity,
-                "unit_price": item.unit_price,
+                "unit_price": unit_price,
                 "delivery_id": delivery.id,
             })
 
@@ -66,10 +67,23 @@ class DeliveryService:
         if total > 0:
             self.txn_repo.create(
                 customer_id=data.customer_id,
-                category="delivery",
+                category="distribution",
                 amount=total,
                 delivery_id=delivery.id,
             )
+
+        # promo 成本
+        for item in data.items:
+            if item.is_promo:
+                from app.models.product import Product
+                product = self.db.query(Product).filter(Product.id == item.product_id).first()
+                if product and product.default_purchase_price > 0:
+                    self.txn_repo.create(
+                        customer_id=data.customer_id,
+                        category="promo",
+                        amount=-(item.quantity * product.default_purchase_price),
+                        delivery_id=delivery.id,
+                    )
 
         delivery.status = "delivered"
         self.db.commit()
@@ -82,7 +96,7 @@ class DeliveryService:
         movements = self.stock_repo.get_by_delivery(delivery_id)
         transactions = self.txn_repo.get_by_delivery(delivery_id)
 
-        delivery_total = sum(t.amount for t in transactions if t.category == "delivery")
+        delivery_total = sum(t.amount for t in transactions if t.category in ("distribution", "delivery"))
         delivery_cancel_total = sum(t.amount for t in transactions if t.category == "delivery_cancel")
         paid_total = sum(t.amount for t in transactions if t.category == "payment")
 
@@ -140,7 +154,6 @@ class DeliveryService:
         for item in data.return_items:
             return_movements.append({
                 "product_id": item.product_id,
-                "shelf_id": item.shelf_id,
                 "direction": "in",
                 "reason": "exchange",
                 "quantity": item.quantity,
@@ -156,7 +169,6 @@ class DeliveryService:
         for item in data.new_items:
             new_movements.append({
                 "product_id": item.product_id,
-                "shelf_id": item.shelf_id,
                 "direction": "out",
                 "reason": "exchange",
                 "quantity": item.quantity,

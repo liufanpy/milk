@@ -15,7 +15,6 @@ class ReturnService:
         for item in data.items:
             self.stock_repo.bulk_create([{
                 "product_id": item.product_id,
-                "shelf_id": item.shelf_id,
                 "direction": "in",
                 "reason": "return",
                 "quantity": item.quantity,
