@@ -23,9 +23,9 @@ class TransactionRepository:
         result = self.db.query(
             func.sum(
                 case(
-                    (Transaction.category.in_(["delivery", "delivery_cancel"]), Transaction.amount),
+                    (Transaction.category.in_(["distribution", "retail", "subscription"]), Transaction.amount),
                     (Transaction.category == "payment", -Transaction.amount),
-                    (Transaction.category == "subscription", -Transaction.amount),
+                    (Transaction.category == "refund", -Transaction.amount),
                     else_=0,
                 )
             )
@@ -34,9 +34,9 @@ class TransactionRepository:
 
     def get_receivables(self) -> list:
         case_expr = case(
-            (Transaction.category.in_(["delivery", "delivery_cancel"]), Transaction.amount),
+            (Transaction.category.in_(["distribution", "retail", "subscription"]), Transaction.amount),
             (Transaction.category == "payment", -Transaction.amount),
-            (Transaction.category == "subscription", -Transaction.amount),
+            (Transaction.category == "refund", -Transaction.amount),
             else_=0,
         )
         return (
@@ -51,7 +51,6 @@ class TransactionRepository:
         )
 
     def get_amounts_by_deliveries(self, delivery_ids: list[int]) -> dict[int, dict]:
-        """批量获取多个送货单的金额汇总 {delivery_id: {total_amount, paid_amount}}"""
         if not delivery_ids:
             return {}
         rows = (
@@ -66,7 +65,7 @@ class TransactionRepository:
         )
         result: dict[int, dict] = {did: {"total_amount": 0.0, "paid_amount": 0.0} for did in delivery_ids}
         for row in rows:
-            if row.category in ("delivery", "delivery_cancel"):
+            if row.category in ("distribution", "delivery", "delivery_cancel"):
                 result[row.delivery_id]["total_amount"] += row.total
             elif row.category == "payment":
                 result[row.delivery_id]["paid_amount"] += row.total
