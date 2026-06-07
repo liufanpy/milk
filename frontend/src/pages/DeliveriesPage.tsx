@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
-import { Badge } from '../components/ui/Badge';
 import { ProductSelect } from '../components/business/ProductSelect';
 import { CustomerSelect } from '../components/business/CustomerSelect';
+import { ItemRowEditor } from '../components/ui/ItemRowEditor';
+import { OrderListTable } from '../components/business/OrderListTable';
+import { OrderFormModal } from '../components/business/OrderFormModal';
+import { OrderDetailModal } from '../components/business/OrderDetailModal';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { useDeliveries, useCreateDelivery, useSettleDelivery, useExchangeDelivery } from '../hooks/useDeliveries';
 import { deliveryApi, customerApi, productApi } from '../services/api';
 
@@ -15,8 +19,14 @@ interface DeliveryItem {
   is_promo: boolean;
 }
 
+const deliveryStatusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'default' }> = {
+  pending: { label: '待配送', variant: 'warning' },
+  delivered: { label: '已送达', variant: 'success' },
+  settled: { label: '已结算', variant: 'success' },
+};
+
 export default function DeliveriesPage() {
-  // Create state
+  const [formOpen, setFormOpen] = useState(false);
   const [customerId, setCustomerId] = useState<number | string>('');
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
   const [items, setItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
@@ -25,7 +35,6 @@ export default function DeliveriesPage() {
   const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
   const [productNames, setProductNames] = useState<Record<number, string>>({});
 
-  // List state
   const [filterCustomer, setFilterCustomer] = useState<string | number>('');
   const [filterStatus, setFilterStatus] = useState('');
   const { data: deliveries = [], refetch } = useDeliveries();
@@ -33,7 +42,6 @@ export default function DeliveriesPage() {
   const settleMutation = useSettleDelivery();
   const exchangeMutation = useExchangeDelivery();
 
-  // Detail state
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [settleAmount, setSettleAmount] = useState(0);
@@ -47,13 +55,11 @@ export default function DeliveriesPage() {
     productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
   }, []);
 
-  // Create helpers
   const updateItem = (idx: number, field: keyof DeliveryItem, value: number | boolean) =>
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
-  const addRow = () => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
 
   const onProductChange = async (idx: number, productId: number) => {
-    updateItem(idx, 'product_id', productId);
+    updateItem(idx, 'product_id', productId as number);
     if (productId) {
       try {
         const { price } = await customerApi.resolvePrice(customerId ? Number(customerId) : 0, productId);
@@ -76,15 +82,13 @@ export default function DeliveriesPage() {
       });
       alert('送货单创建成功');
       setCustomerId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]); setNote('');
+      setFormOpen(false);
       refetch();
     } catch (err: any) {
       alert(err?.response?.data?.detail || '创建失败');
     }
   };
 
-  const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
-
-  // Detail
   const openDetail = async (d: any) => {
     const detail = await deliveryApi.get(d.id);
     setSelectedDelivery(detail);
@@ -128,18 +132,10 @@ export default function DeliveriesPage() {
 
   const handleExchange = async () => {
     if (!selectedDelivery) return;
-
-    if (!exchangeAmountMatch) {
-      alert('换货金额不一致，请走退货结算后重新开单');
-      return;
+    if (!exchangeAmountMatch) { alert('换货金额不一致，请走退货结算后重新开单'); return; }
+    if (returnItems.some(i => !i.product_id || !i.quantity) || newItems.some(i => !i.product_id || !i.quantity)) {
+      alert('请填写完整信息'); return;
     }
-
-    if (returnItems.some(i => !i.product_id || !i.quantity) ||
-        newItems.some(i => !i.product_id || !i.quantity)) {
-      alert('请填写完整信息');
-      return;
-    }
-
     try {
       await exchangeMutation.mutateAsync({
         id: selectedDelivery.id,
@@ -157,54 +153,90 @@ export default function DeliveriesPage() {
     }
   };
 
-  // Filter deliveries
   const filtered = deliveries.filter((d: any) => {
     if (filterCustomer && String(d.customer_id) !== String(filterCustomer)) return false;
     if (filterStatus && d.status !== filterStatus) return false;
     return true;
   });
 
+  const columns = [
+    { key: 'id', title: '#', render: (d: any) => `#${d.id}` },
+    { key: 'customer_name', title: '客户', render: (d: any) => customerNames[d.customer_id] || `客户#${d.customer_id}` },
+    { key: 'delivery_date', title: '日期', render: (d: any) => d.delivery_date || d.created_at?.slice(0, 10) },
+    {
+      key: 'status', title: '状态',
+      render: (d: any) => <StatusBadge status={d.status} config={deliveryStatusConfig} />,
+    },
+    { key: 'total_amount', title: '总金额', render: (d: any) => `¥${d.total_amount || 0}` },
+    { key: 'paid_amount', title: '已付', render: (d: any) => <span className="text-green-600">¥{d.paid_amount || 0}</span> },
+    { key: 'unpaid_amount', title: '未付', render: (d: any) => <span className="text-red-600 font-medium">¥{d.unpaid_amount || 0}</span> },
+    {
+      key: 'actions', title: '操作',
+      render: (d: any) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" variant="secondary" onClick={() => openDetail(d)}>详情</Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">送货单管理</h2><Button variant="secondary" size="sm" onClick={() => window.open('/api/deliveries/export')}>导出 CSV</Button></div>
-
-      {/* Create form */}
-      <div className="bg-white rounded-lg border p-4 mb-6 space-y-3">
-        <h3 className="font-semibold">新建送货单</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium text-gray-700">客户</label>
-            <CustomerSelect value={customerId} onChange={(v) => setCustomerId(v)} priceTier="批发" />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700">日期</label>
-            <Input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
-          </div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">送货单管理</h2>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => window.open('/api/deliveries/export')}>导出 CSV</Button>
+          <Button onClick={() => setFormOpen(true)}>+ 新建送货</Button>
         </div>
-        {items.map((item, idx) => (
-          <div key={idx} className="flex gap-2 items-end">
-            <div className="flex-1"><label className="text-xs text-gray-500">产品</label><ProductSelect value={item.product_id} onChange={(v) => onProductChange(idx, v)} onlyInStock /></div>
-            <div className="w-20"><label className="text-xs text-gray-500">数量</label><Input type="number" value={String(item.quantity)} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} /></div>
-            <div className="w-24"><label className="text-xs text-gray-500">售价</label><Input type="number" value={String(item.unit_price)} onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))} /></div>
-            <label className="flex items-center gap-1 text-xs pb-2">
-              <input type="checkbox" checked={item.is_promo} onChange={(e) => updateItem(idx, 'is_promo', e.target.checked)} />
-              赠送
-            </label>
-            <Button variant="danger" size="sm" onClick={() => setItems(items.filter((_, i) => i !== idx))} disabled={items.length <= 1}>×</Button>
-          </div>
-        ))}
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={addRow}>+ 加行</Button>
-          <span className="text-sm text-gray-500 ml-auto">合计: ¥{total.toFixed(2)}</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />已收款</label>
-          <Input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} className="flex-1" />
-        </div>
-        <Button onClick={handleCreate} disabled={createMutation.isPending}>提交送货单</Button>
       </div>
 
-      {/* List */}
+      <OrderFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title="新建送货单"
+        onSubmit={handleCreate}
+        isPending={createMutation.isPending}
+        submitLabel="提交送货单"
+      >
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-gray-700">客户</label>
+              <CustomerSelect value={customerId} onChange={(v) => setCustomerId(v)} priceTier="批发" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">日期</label>
+              <Input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+            </div>
+          </div>
+          <ItemRowEditor
+            items={items}
+            onUpdate={updateItem}
+            onProductChange={onProductChange}
+            onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
+            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }])}
+            onlyInStock
+          >
+            {(item, idx) => (
+              <label className="flex items-center gap-1 text-xs pb-2">
+                <input
+                  type="checkbox"
+                  checked={item.is_promo}
+                  onChange={(e) => updateItem(idx, 'is_promo', e.target.checked)}
+                />
+                赠送
+              </label>
+            )}
+          </ItemRowEditor>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />已收款
+            </label>
+            <Input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} className="flex-1" />
+          </div>
+        </div>
+      </OrderFormModal>
+
       <div className="bg-white rounded-lg border p-4">
         <h3 className="font-semibold mb-3">送货单列表</h3>
         <div className="flex gap-3 mb-3">
@@ -216,90 +248,41 @@ export default function DeliveriesPage() {
             <option value="settled">已结算</option>
           </select>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b bg-gray-50 text-left text-gray-600">
-              <th className="px-4 py-2">#</th><th className="px-4 py-2">客户</th><th className="px-4 py-2">日期</th><th className="px-4 py-2">状态</th><th className="px-4 py-2">总金额</th><th className="px-4 py-2">已付</th><th className="px-4 py-2">未付</th><th className="px-4 py-2">操作</th>
-            </tr></thead>
-            <tbody>
-              {filtered.map((d: any) => (
-                <tr key={d.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(d)}>
-                  <td className="px-4 py-2">#{d.id}</td>
-                  <td className="px-4 py-2">{customerNames[d.customer_id] || `客户#${d.customer_id}`}</td>
-                  <td className="px-4 py-2">{d.delivery_date || d.created_at?.slice(0, 10)}</td>
-                  <td className="px-4 py-2"><Badge variant={d.status === 'delivered' || d.status === 'settled' ? 'success' : 'warning'}>{d.status === 'settled' ? '已结算' : d.status === 'delivered' ? '已送达' : d.status}</Badge></td>
-                  <td className="px-4 py-2">¥{d.total_amount || 0}</td>
-                  <td className="px-4 py-2 text-green-600">¥{d.paid_amount || 0}</td>
-                  <td className="px-4 py-2 text-red-600 font-medium">¥{d.unpaid_amount || 0}</td>
-                  <td className="px-4 py-2"><Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openDetail(d); }}>详情</Button></td>
-                </tr>
-              ))}
-              {filtered.length === 0 && <tr><td colSpan={8} className="text-center py-8 text-gray-400">暂无送货单</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <OrderListTable
+          columns={columns}
+          data={filtered}
+          rowKey={(d) => d.id}
+          onRowClick={(d) => openDetail(d)}
+        />
       </div>
 
       {/* Detail Modal */}
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={`送货单 #${selectedDelivery?.id}`}>
-        {selectedDelivery && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div><span className="text-gray-500">总金额:</span> <strong>¥{selectedDelivery.total_amount}</strong></div>
-              <div><span className="text-gray-500">已付:</span> <span className="text-green-600">¥{selectedDelivery.paid_amount}</span></div>
-              <div><span className="text-gray-500">未付:</span> <span className="text-red-600 font-bold">¥{selectedDelivery.unpaid_amount}</span></div>
-            </div>
-            <div>
-              <h4 className="text-sm font-medium mb-1">品项</h4>
-              {selectedDelivery.items?.map((item: any, i: number) => (
-                <div key={i} className="text-sm text-gray-600 border-b py-1">{productNames[item.product_id] || `产品#${item.product_id}`} — qty: {item.quantity}</div>
-              ))}
-            </div>
-            {selectedDelivery.exchanges && selectedDelivery.exchanges.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium mb-2">换货记录</h4>
-                <div className="space-y-2">
-                  {selectedDelivery.exchanges.map((ex: any, i: number) => (
-                    <div key={i} className="bg-gray-50 rounded p-3 text-sm">
-                      <div className="text-gray-400 text-xs mb-1">
-                        {new Date(ex.created_at).toLocaleString()}
-                      </div>
-                      <div className="text-gray-600">
-                        退回: {(ex.return_items ?? []).map((it: any) =>
-                          `${productNames[it.product_id] || '产品#' + it.product_id} ×${it.quantity} (¥${it.unit_price})`
-                        ).join(', ')}
-                      </div>
-                      <div className="text-gray-600">
-                        新发: {(ex.new_items ?? []).map((it: any) =>
-                          `${productNames[it.product_id] || '产品#' + it.product_id} ×${it.quantity} (¥${it.unit_price})`
-                        ).join(', ')}
-                      </div>
-                      <div className="text-gray-400 text-xs mt-1">
-                        {ex.return_items?.length > 0 && ex.new_items?.length > 0 &&
-                         ex.return_items.length === ex.new_items.length &&
-                         ex.return_items.every((it: any, j: number) =>
-                           it.product_id === ex.new_items[j].product_id &&
-                           it.quantity === ex.new_items[j].quantity
-                         ) ? '同产品换货' : '等值换货'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div>
-              <h4 className="text-sm font-medium mb-1">收款记录</h4>
-              {selectedDelivery.transactions?.map((t: any) => (
-                <div key={t.id} className="text-sm text-gray-600">#{t.id} [{t.category}] ¥{t.amount} — {new Date(t.created_at).toLocaleDateString()}</div>
-              ))}
-            </div>
-            <div className="flex gap-2 pt-2 border-t">
-              <Button size="sm" onClick={() => { setSettleAmount(selectedDelivery.unpaid_amount); setSettleOpen(true); }}>结算</Button>
-              <Button size="sm" variant="secondary" onClick={() => setExchangeOpen(true)}>换货</Button>
-            </div>
+      <OrderDetailModal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title={`送货单 #${selectedDelivery?.id}`}
+        headerInfo={
+          <>
+            <div>客户: {customerNames[selectedDelivery?.customer_id] || `客户#${selectedDelivery?.customer_id}`}</div>
+            <div>日期: {selectedDelivery?.delivery_date || selectedDelivery?.created_at?.slice(0, 10)}</div>
+          </>
+        }
+        items={selectedDelivery?.items || []}
+        status={selectedDelivery?.status}
+        statusConfig={deliveryStatusConfig}
+      >
+        <div className="flex gap-2 w-full">
+          <div className="flex-1 text-sm space-y-1">
+            <div>总金额: ¥{selectedDelivery?.total_amount}</div>
+            <div>已付: <span className="text-green-600">¥{selectedDelivery?.paid_amount}</span></div>
+            <div>未付: <span className="text-red-600 font-bold">¥{selectedDelivery?.unpaid_amount}</span></div>
           </div>
-        )}
-      </Modal>
+          <div className="flex gap-2 items-start">
+            <Button size="sm" onClick={() => { setSettleAmount(selectedDelivery?.unpaid_amount || 0); setSettleOpen(true); }}>结算</Button>
+            <Button size="sm" variant="secondary" onClick={() => setExchangeOpen(true)}>换货</Button>
+          </div>
+        </div>
+      </OrderDetailModal>
 
       {/* Settle Modal */}
       <Modal open={settleOpen} onClose={() => setSettleOpen(false)} title="结算">
@@ -312,7 +295,7 @@ export default function DeliveriesPage() {
         </div>
       </Modal>
 
-      {/* Exchange Modal */}
+      {/* Exchange Modal — keep as-is, this is complex custom logic */}
       <Modal open={exchangeOpen} onClose={() => setExchangeOpen(false)} title="换货">
         <div className="space-y-4">
           <div>
@@ -342,9 +325,7 @@ export default function DeliveriesPage() {
           <div className="text-sm text-gray-500 pt-2 border-t">
             <div>退回合计: ¥{returnTotal.toFixed(2)}</div>
             <div>新发合计: ¥{newTotal.toFixed(2)}</div>
-            {!exchangeAmountMatch && (
-              <div className="text-red-500 font-medium">金额不一致，无法换货</div>
-            )}
+            {!exchangeAmountMatch && <div className="text-red-500 font-medium">金额不一致，无法换货</div>}
           </div>
           <Button onClick={handleExchange} disabled={exchangeMutation.isPending}>确认换货</Button>
         </div>
