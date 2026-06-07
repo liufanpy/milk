@@ -75,12 +75,12 @@ frontend/
 - Modify: `backend/app/models/stock_movement.py`
 - Modify: `backend/app/models/transaction.py`
 
-- [ ] **Step 1: 写 ReturnOrder 模型**
+- [ ] **Step 1: 写 ReturnOrder 模型 + 给已有表加 FK 字段**
 
 ```python
 # backend/app/models/return_order.py
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from app.database import Base
 
 
@@ -97,23 +97,24 @@ class ReturnOrder(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 ```
 
-- [ ] **Step 2: 生成 migration**
+同时在已有模型里加：
+
+```python
+# backend/app/models/stock_movement.py 追加:
+return_order_id = Column(Integer, ForeignKey("return_orders.id"), nullable=True)
+
+# backend/app/models/transaction.py 追加:
+return_order_id = Column(Integer, ForeignKey("return_orders.id"), nullable=True)
+```
+
+- [ ] **Step 2: 生成并运行 migration（此时 autogenerate 能检测到所有改动）**
 
 ```bash
 cd backend && alembic revision --autogenerate -m "add return_orders"
+cd backend && alembic upgrade head
 ```
 
-- [ ] **Step 3: 给 stock_movements 和 transactions 加字段**
-
-```python
-# 在 StockMovement 里加:
-return_order_id = Column(Integer, ForeignKey("return_orders.id"), nullable=True)
-
-# 在 Transaction 里加:
-return_order_id = Column(Integer, ForeignKey("return_orders.id"), nullable=True)
-```
-
-再跑一次 autogenerate 或者直接在上一步 migration 里手动补充 add_column。
+Expected: 表创建 + FK 列添加成功，无报错。
 
 - [ ] **Step 4: 运行迁移验证**
 
@@ -688,7 +689,7 @@ git commit -m "test: 退货单 create/list/detail/cancel 测试"
 - Modify: `backend/app/models/__init__.py`
 - Modify: `backend/app/models/stock_movement.py`
 
-- [ ] **Step 1: 写 WastageOrder 模型**
+- [ ] **Step 1: 写 WastageOrder 模型 + StockMovement 加 FK**
 
 ```python
 # backend/app/models/wastage_order.py
@@ -707,14 +708,12 @@ class WastageOrder(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 ```
 
-- [ ] **Step 2: 给 StockMovement 加字段**
-
 ```python
-# StockMovement 加:
+# backend/app/models/stock_movement.py 追加:
 wastage_order_id = Column(Integer, ForeignKey("wastage_orders.id"), nullable=True)
 ```
 
-- [ ] **Step 3: 生成并运行 migration**
+- [ ] **Step 2: 生成并运行 migration**
 
 ```bash
 cd backend && alembic revision --autogenerate -m "add wastage_orders"
@@ -1004,6 +1003,7 @@ def list_wastage(svc: WastageService = Depends(get_wastage_service)):
     return svc.list_wastage()
 
 
+# ⚠️ /export 必须在 /{order_id} 之前注册，否则 "export" 会被当成 order_id
 @router.get("/export")
 def export_wastage(db: Session = Depends(get_db)):
     rows = db.query(StockMovement).join(WastageOrder).filter(
@@ -1360,11 +1360,6 @@ export function ItemDetailTable({ items, productNames }: ItemDetailTableProps) {
 ```tsx
 // frontend/src/components/business/OrderListTable.tsx
 import { ReactNode } from 'react';
-import { StatusBadge } from '../ui/StatusBadge';
-
-interface StatusConfig {
-  [status: string]: { label: string; variant: 'success' | 'warning' | 'danger' | 'default' };
-}
 
 interface Column<T> {
   key: string;
@@ -1840,12 +1835,46 @@ git commit -m "feat: ReturnsPage 表格+弹窗+撤销，接入共享组件"
 
 - [ ] **Step 1: 重写 WastagePage**
 
-代码结构跟 ReturnsPage 一致，区别：
-- 没有客户选择器
-- 损耗原因下拉作为 ItemRowEditor 的 slot
-- 列表列：ID / 品项摘要 / 原因 / 状态 / 日期
+关键差异点（其余骨架跟 ReturnsPage 一致）：
 
-完成后比照 ReturnsPage 模式实现。
+**新建表单：无客户选择器，损耗原因下拉作为 ItemRowEditor slot**
+
+```tsx
+// 表单头字段只有 note，没有客户
+const [note, setNote] = useState('');
+const [items, setItems] = useState<WastageItem[]>([
+  { product_id: 0, quantity: 1, reason: 'expired' },
+]);
+
+// ItemRowEditor 的 slot 是原因下拉
+<ItemRowEditor ...>
+  {(item, idx) => (
+    <select
+      value={item.reason}
+      onChange={(e) => updateItem(idx, 'reason', e.target.value)}
+      className="border rounded px-2 py-1 text-sm"
+    >
+      <option value="expired">过期</option>
+      <option value="damaged">破损</option>
+      <option value="self_consumed">自喝</option>
+    </select>
+  )}
+</ItemRowEditor>
+```
+
+**列表 columns：**
+
+```tsx
+const columns = [
+  { key: 'id', title: '#', render: (r: any) => `#${r.id}` },
+  { key: 'items_summary', title: '品项' },
+  { key: 'reasons', title: '原因', render: (r: any) => r.reasons?.join('、') },
+  { key: 'status', title: '状态', render: (r: any) => <StatusBadge status={r.status} config={statusConfig} /> },
+  { key: 'created_at', title: '日期', render: (r: any) => r.created_at?.slice(0, 10) },
+];
+```
+
+**详情 headerInfo：**只显示备注和日期，无客户信息。
 
 - [ ] **Step 2: Commit**
 
@@ -1866,11 +1895,42 @@ git commit -m "feat: WastagePage 表格+弹窗+撤销，接入共享组件"
 - 新建改成 `OrderFormModal`
 - 加详情弹窗
 
-- [ ] **Step 1: 改造**
+- [ ] **Step 1: 改造 SalesPage**
 
-代码模式跟 ReturnsPage 相同。列表列：客户 / 品项摘要 / 金额 / 状态(已收款/未收款/已撤销) / 日期 / 操作(撤销)。
+**列表 columns（关键差异：已收款/未收款/已撤销 三种状态）：**
+
+```tsx
+const saleStatusConfig = {
+  confirmed: { label: '已收款', variant: 'success' as const },   // paid=true 用此
+  unpaid: { label: '未收款', variant: 'warning' as const },      // paid=false 用此
+  cancelled: { label: '已撤销', variant: 'danger' as const },
+};
+
+const columns = [
+  { key: 'customer_name', title: '客户' },
+  { key: 'items_summary', title: '品项' },
+  { key: 'total_amount', title: '金额', render: (s: any) => `¥${s.total_amount.toFixed(2)}` },
+  {
+    key: 'status', title: '状态',
+    render: (s: any) => {
+      if (s.status === 'cancelled') return <StatusBadge status="cancelled" config={saleStatusConfig} />;
+      return <StatusBadge status={s.paid ? 'confirmed' : 'unpaid'} config={saleStatusConfig} />;
+    },
+  },
+  { key: 'created_at', title: '日期', render: (s: any) => s.created_at?.slice(0, 10) },
+];
+```
+
+**新建表单：**客户(可选) + ItemRowEditor(slot: 赠送勾选) + 已收款勾选 + 备注。
+
+**详情弹窗：**headerInfo 显示客户/日期/状态/是否已收款。底部撤销按钮（仅 confirmed 状态）。
 
 - [ ] **Step 2: Commit**
+
+```bash
+git add frontend/src/pages/SalesPage.tsx
+git commit -m "feat: SalesPage 表格+弹窗+撤销，接入共享组件"
+```
 
 ---
 
@@ -1880,12 +1940,52 @@ git commit -m "feat: WastagePage 表格+弹窗+撤销，接入共享组件"
 - Modify: `frontend/src/pages/PurchasesPage.tsx`
 - Modify: `frontend/src/pages/DeliveriesPage.tsx`
 
-两页已有列表表格和详情弹窗，改动较轻：
-- 新建表单从内联改 `OrderFormModal`
-- 接入 `ItemRowEditor`、`OrderDetailModal`、`StatusBadge`
-- 保留现有业务逻辑（草稿/确认、结算/换货）
+两页已有列表表格和详情弹窗，改动较轻。
 
-- [ ] **Commit per page**
+- [ ] **Step 1: PurchasesPage 改造**
+
+**新建表单改 Modal：**把现有内联的 `<div className="bg-white rounded-lg border p-4 mb-6">` 整个迁入 `<OrderFormModal>`。接入 `ItemRowEditor`。进货无 slot。
+
+**保留原有双按钮逻辑：**`OrderFormModal` 的 `submitLabel` 不够用，需要在 children 内自己写按钮：
+
+```tsx
+<OrderFormModal open={formOpen} onClose={...} title="新建进货单" onSubmit={() => {}} submitLabel="">
+  {/* 供应商+日期 */}
+  {/* ItemRowEditor 无 slot */}
+  {/* 备注 */}
+  <div className="flex gap-2 pt-2 border-t">
+    <Button variant="secondary" onClick={() => handleSubmit('draft')}>保存草稿</Button>
+    <Button onClick={() => handleSubmit('confirmed')}>确认入库</Button>
+    <Button variant="secondary" onClick={() => setFormOpen(false)}>取消</Button>
+  </div>
+</OrderFormModal>
+```
+
+**接入 StatusBadge：**`StatusBadge status={o.status} config={purchaseStatusConfig}`。列表接入 `OrderListTable`，rowKey 用 `o.id`。
+
+- [ ] **Step 2: DeliveriesPage 改造**
+
+**新建表单改 Modal + ItemRowEditor(slot: 赠送勾选)：**
+
+```tsx
+<ItemRowEditor ... onlyInStock>
+  {(item, idx) => (
+    <label className="flex items-center gap-1 text-xs pb-2">
+      <input type="checkbox" checked={item.is_promo} onChange={(e) => updateItem(idx, 'is_promo', e.target.checked)} />
+      赠送
+    </label>
+  )}
+</ItemRowEditor>
+```
+
+**详情弹窗接入 OrderDetailModal：**保留现有结算/换货 Modal 和逻辑，headerInfo 显示客户/总金额/已付/未付。底部按钮：结算 + 换货。换货 Modal 完全不动。
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add frontend/src/pages/PurchasesPage.tsx frontend/src/pages/DeliveriesPage.tsx
+git commit -m "feat: PurchasesPage/DeliveriesPage 新建改Modal，接入共享组件"
+```
 
 ---
 
@@ -1894,9 +1994,40 @@ git commit -m "feat: WastagePage 表格+弹窗+撤销，接入共享组件"
 **Files:**
 - Modify: `frontend/src/pages/SubscriptionsPage.tsx`
 
-改动最小：列表接入 `OrderListTable`，接入 `StatusBadge`。新建表单不动（结构特殊，不是品项行模式）。详情页保持独立路由。
+改动最小。
+- [ ] **Step 1: 仅换列表渲染**
 
-- [ ] **Commit**
+把现有的手写 `<table>` 换成 `OrderListTable`：
+
+```tsx
+const subStatusConfig = {
+  active: { label: '进行中', variant: 'success' as const },
+  completed: { label: '已完成', variant: 'default' as const },
+  cancelled: { label: '已取消', variant: 'danger' as const },
+};
+
+const columns = [
+  { key: 'id', title: '#', render: (o: any) => `#${o.id}` },
+  { key: 'customer_name', title: '客户', render: (o: any) => customerNames[o.customer_id] || '' },
+  { key: 'paid_amount', title: '实付金额', render: (o: any) => `¥${o.paid_amount}` },
+  { key: 'remaining_amount', title: '剩余金额', render: (o: any) => `¥${o.remaining_amount}` },
+  { key: 'status', title: '状态', render: (o: any) => <StatusBadge status={o.status} config={subStatusConfig} /> },
+  { key: 'actions', title: '操作', render: (o: any) => (
+    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); navigate(`/subscriptions/${o.id}`); }}>详情</Button>
+  )},
+];
+```
+
+**新建表单不动**（订奶的创建是单个金额+客户，不是品项行模式，不适合 ItemRowEditor）。
+
+**详情页保持独立路由** `/subscriptions/:id`。
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add frontend/src/pages/SubscriptionsPage.tsx
+git commit -m "feat: SubscriptionsPage 列表接入 OrderListTable + StatusBadge"
+```
 
 ---
 
