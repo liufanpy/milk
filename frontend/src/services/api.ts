@@ -88,6 +88,9 @@ export const returnApi = {
 export const wastageApi = {
   create: (data: any) => api.post('/wastage', data).then(r => r.data),
   list: () => api.get('/wastage').then(r => r.data),
+  get: (id: number) => api.get(`/wastage/${id}`).then(r => r.data),
+  cancel: (id: number) => api.post(`/wastage/${id}/cancel`).then(r => r.data),
+  exportCsv: () => window.open('/api/wastage/export'),
 };
 
 // Inventory
