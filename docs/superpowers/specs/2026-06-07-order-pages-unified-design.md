@@ -37,7 +37,7 @@
 | status | VARCHAR(20), DEFAULT 'confirmed' | confirmed / cancelled |
 | created_at / updated_at | DATETIME | |
 
-损耗品项行的原因（expired/damaged/self_consumed/giveaway/promotion）放在 stock_movements.reason 字段。
+损耗品项行的原因只有 3 种：expired / damaged / self_consumed，放在 stock_movements.reason 字段。giveaway 和 promotion 挪到销售/送货的 is_promo 处理。
 
 ### 已有表加字段
 
@@ -164,7 +164,7 @@ function PurchasesPage() {
 
 - 主数据页（客户/产品/供应商）——已规范，不动
 - 订奶详情页保持独立路由 `/subscriptions/:id`——内容复杂度远超弹窗承载
-- 促销搭赠（is_promo）留在销售/送货品项行，不纳入损耗
+- 促销搭赠（is_promo）留在销售/送货品项行。is_promo 不存数据库字段，在后端被翻译为 stock_movement.unit_price=0 + transaction category=promo。营销成本查询：`stock_movements WHERE unit_price=0 AND direction='out'`
 - CSV 导入导出各页保持现有实现，不做统一封装
 
 ## 六、错误处理
