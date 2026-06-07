@@ -10,3 +10,4 @@ from app.models.operation_log import OperationLog
 from app.models.purchase_order import PurchaseOrder
 from app.models.retail_order import RetailOrder
 from app.models.return_order import ReturnOrder
+from app.models.wastage_order import WastageOrder
