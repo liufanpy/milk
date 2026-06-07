@@ -63,6 +63,8 @@ export const purchaseApi = {
 export const saleApi = {
   create: (data: any) => api.post('/sales', data).then(r => r.data),
   list: () => api.get('/sales').then(r => r.data),
+  get: (id: number) => api.get(`/sales/${id}`).then(r => r.data),
+  cancel: (id: number) => api.post(`/sales/${id}/cancel`).then(r => r.data),
 };
 
 // Deliveries

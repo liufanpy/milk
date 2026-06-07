@@ -145,3 +145,26 @@ export interface PurchaseOrderDetailItem {
   quantity: number;
   unit_price: number;
 }
+
+export interface RetailOrder {
+  id: number;
+  customer_id: number | null;
+  customer_name: string;
+  item_count: number;
+  total_amount: number;
+  paid: boolean;
+  status: string;
+  items_summary: string;
+  created_at: string;
+}
+
+export interface RetailOrderDetail extends RetailOrder {
+  items: RetailOrderDetailItem[];
+}
+
+export interface RetailOrderDetailItem {
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+}
