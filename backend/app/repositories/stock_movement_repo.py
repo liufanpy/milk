@@ -35,6 +35,16 @@ class StockMovementRepository:
             StockMovement.subscription_order_id == subscription_order_id
         ).all()
 
+    def get_by_return_order(self, return_order_id: int) -> list:
+        return self.db.query(StockMovement).filter(
+            StockMovement.return_order_id == return_order_id
+        ).all()
+
+    def get_by_wastage_order(self, wastage_order_id: int) -> list:
+        return self.db.query(StockMovement).filter(
+            StockMovement.wastage_order_id == wastage_order_id
+        ).all()
+
     def get_inventory(self) -> list:
         """按 product_id 汇总库存（不再按 shelf_id 分组）"""
         return (

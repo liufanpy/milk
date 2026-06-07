@@ -11,6 +11,7 @@ class ReturnItem(BaseModel):
 
 class ReturnCreate(BaseModel):
     customer_id: int
-    delivery_id: Optional[int] = None
+    source_type: Optional[str] = None   # 'delivery' | 'retail' | 'subscription'
+    source_order_id: Optional[int] = None
     items: List[ReturnItem]
     note: str = ""
