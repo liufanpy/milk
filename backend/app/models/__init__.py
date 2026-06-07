@@ -1,7 +1,6 @@
 from app.models.product import Product
 from app.models.customer import Customer
 from app.models.supplier import Supplier
-from app.models.shelf import Shelf
 from app.models.stock_movement import StockMovement
 from app.models.transaction import Transaction
 from app.models.delivery import Delivery
@@ -10,3 +9,4 @@ from app.models.product_customer_price import ProductCustomerPrice
 from app.models.operation_log import OperationLog
 from app.models.purchase_order import PurchaseOrder
 from app.models.retail_order import RetailOrder
+from app.models.return_order import ReturnOrder

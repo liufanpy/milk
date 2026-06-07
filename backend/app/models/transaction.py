@@ -15,5 +15,6 @@ class Transaction(Base):
     purchase_order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)
     subscription_order_id = Column(Integer, ForeignKey("subscription_orders.id"), nullable=True)
     retail_order_id = Column(Integer, ForeignKey("retail_orders.id"), nullable=True)
+    return_order_id = Column(Integer, ForeignKey("return_orders.id"), nullable=True)
     note = Column(String(500), default="")
     created_at = Column(DateTime, default=datetime.now)
