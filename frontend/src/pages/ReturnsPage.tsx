@@ -1,75 +1,203 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { ProductSelect } from '../components/business/ProductSelect';
 import { CustomerSelect } from '../components/business/CustomerSelect';
-import { returnApi, productApi } from '../services/api';
+import { ItemRowEditor } from '../components/ui/ItemRowEditor';
+import { OrderListTable } from '../components/business/OrderListTable';
+import { OrderFormModal } from '../components/business/OrderFormModal';
+import { OrderDetailModal } from '../components/business/OrderDetailModal';
+import { StatusBadge } from '../components/ui/StatusBadge';
+import { returnApi, customerApi } from '../services/api';
 
-interface ReturnItemRow {
+interface ReturnItem {
   product_id: number;
   quantity: number;
   unit_price: number;
   is_wasted: boolean;
 }
 
+const defaultForm = {
+  customer_id: '' as number | string,
+  source_type: '' as string,
+  source_order_id: '' as string,
+  note: '',
+};
+
+const returnStatusConfig = {
+  confirmed: { label: '已确认', variant: 'success' as const },
+  cancelled: { label: '已撤销', variant: 'danger' as const },
+};
+
 export default function ReturnsPage() {
-  const [customerId, setCustomerId] = useState<number | string>('');
-  const [deliveryId, setDeliveryId] = useState('');
-  const [items, setItems] = useState<ReturnItemRow[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_wasted: false }]);
-  const [note, setNote] = useState('');
+  // 新建
+  const [formOpen, setFormOpen] = useState(false);
+  const [header, setHeader] = useState(defaultForm);
+  const [items, setItems] = useState<ReturnItem[]>([
+    { product_id: 0, quantity: 1, unit_price: 0, is_wasted: false },
+  ]);
+
+  // 列表
   const [returns, setReturns] = useState<any[]>([]);
-  const [productNames, setProductNames] = useState<Record<number, string>>({});
+
+  // 详情
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detail, setDetail] = useState<any>(null);
+  const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
+
+  const loadReturns = useCallback(() => returnApi.list().then(setReturns), []);
 
   useEffect(() => {
-    returnApi.list().then(setReturns);
-    productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
-  }, []);
+    loadReturns();
+    customerApi.list().then((data: any) =>
+      setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name])))
+    );
+  }, [loadReturns]);
 
-  const updateItem = (idx: number, field: string, value: any) =>
+  const updateItem = (idx: number, field: keyof ReturnItem, value: number | boolean) =>
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
 
   const handleSubmit = async () => {
-    if (!customerId || items.some(i => !i.product_id || !i.quantity)) {
+    if (!header.customer_id || items.some(i => !i.product_id || !i.quantity)) {
       alert('请填写完整信息'); return;
     }
-    await returnApi.create({
-      customer_id: Number(customerId),
-      delivery_id: deliveryId ? Number(deliveryId) : null,
-      items,
-      note,
-    });
-    alert('退货成功');
-    setCustomerId(''); setDeliveryId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0, is_wasted: false }]); setNote('');
-    returnApi.list().then(setReturns);
+    try {
+      await returnApi.create({
+        customer_id: Number(header.customer_id),
+        source_type: header.source_type || null,
+        source_order_id: header.source_order_id ? Number(header.source_order_id) : null,
+        items,
+        note: header.note,
+      });
+      alert('退货成功');
+      setFormOpen(false);
+      setHeader(defaultForm);
+      setItems([{ product_id: 0, quantity: 1, unit_price: 0, is_wasted: false }]);
+      loadReturns();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '创建失败');
+    }
   };
+
+  const openDetail = async (r: any) => {
+    const d = await returnApi.get(r.id);
+    setDetail(d);
+    setDetailOpen(true);
+  };
+
+  const handleCancel = async () => {
+    if (!detail || !confirm('确定撤销此退货单？将反向冲抵库存和退款')) return;
+    await returnApi.cancel(detail.id);
+    alert('已撤销');
+    setDetailOpen(false);
+    loadReturns();
+  };
+
+  const columns = [
+    { key: 'id', title: '#', render: (r: any) => `#${r.id}` },
+    { key: 'customer_name', title: '客户' },
+    { key: 'items_summary', title: '品项' },
+    {
+      key: 'total_refund', title: '退款金额',
+      render: (r: any) => `¥${r.total_refund.toFixed(2)}`,
+    },
+    {
+      key: 'status', title: '状态',
+      render: (r: any) => <StatusBadge status={r.status} config={returnStatusConfig} />,
+    },
+    { key: 'created_at', title: '日期', render: (r: any) => r.created_at?.slice(0, 10) },
+  ];
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">退货管理</h2>
-      <div className="bg-white rounded-lg border p-4 mb-6 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium">客户</label><CustomerSelect value={customerId} onChange={setCustomerId} /></div>
-          <div><label className="text-sm font-medium">关联送货单ID(可选)</label><Input value={deliveryId} onChange={(e) => setDeliveryId(e.target.value)} /></div>
-        </div>
-        {items.map((item, idx) => (
-          <div key={idx} className="flex gap-2 items-end">
-            <div className="flex-1"><ProductSelect value={item.product_id} onChange={(v) => updateItem(idx, 'product_id', v)} /></div>
-            <div className="w-20"><Input type="number" placeholder="数量" value={String(item.quantity)} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} /></div>
-            <div className="w-24"><Input type="number" placeholder="单价" value={String(item.unit_price)} onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))} /></div>
-            <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.is_wasted} onChange={(e) => updateItem(idx, 'is_wasted', e.target.checked)} />报废</label>
-            <Button variant="danger" size="sm" onClick={() => setItems(items.filter((_, i) => i !== idx))} disabled={items.length <= 1}>×</Button>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">退货管理</h2>
+        <Button onClick={() => setFormOpen(true)}>+ 新建退货</Button>
+      </div>
+
+      <OrderListTable
+        columns={columns}
+        data={returns}
+        rowKey={(r) => r.id}
+        onRowClick={openDetail}
+      />
+
+      <OrderFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title="新建退货单"
+        onSubmit={handleSubmit}
+        submitLabel="提交退货"
+      >
+        <div className="space-y-3">
+          <CustomerSelect value={header.customer_id} onChange={(v) => setHeader({ ...header, customer_id: v })} />
+          <div className="grid grid-cols-2 gap-3">
+            <select
+              value={header.source_type}
+              onChange={(e) => setHeader({ ...header, source_type: e.target.value })}
+              className="border rounded px-3 py-2 text-sm"
+            >
+              <option value="">不关联来源</option>
+              <option value="delivery">送货单</option>
+              <option value="retail">零售单</option>
+              <option value="subscription">订奶单</option>
+            </select>
+            <Input
+              placeholder="来源单号"
+              value={header.source_order_id}
+              onChange={(e) => setHeader({ ...header, source_order_id: e.target.value })}
+            />
           </div>
-        ))}
-        <Button variant="secondary" size="sm" onClick={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_wasted: false }])}>+ 加行</Button>
-        <Input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} />
-        <Button onClick={handleSubmit}>提交退货</Button>
-      </div>
-      <h3 className="text-lg font-semibold mb-2">退货记录</h3>
-      <div className="bg-white rounded-lg border overflow-hidden">
-        {returns.map((r: any) => (
-          <div key={r.id} className="px-4 py-2 border-b text-sm text-gray-600">{productNames[r.product_id] || `产品#${r.product_id}`} 退货 {r.quantity} — {new Date(r.created_at).toLocaleDateString()}</div>
-        ))}
-      </div>
+          <ItemRowEditor
+            items={items}
+            onUpdate={updateItem}
+            onProductChange={(idx, pid) => {
+              updateItem(idx, 'product_id', pid);
+              if (pid && header.customer_id) {
+                customerApi.resolvePrice(Number(header.customer_id), pid)
+                  .then(({ price }: any) => updateItem(idx, 'unit_price', price))
+                  .catch(() => {});
+              }
+            }}
+            onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
+            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_wasted: false }])}
+          >
+            {(item, idx) => (
+              <label className="flex items-center gap-1 text-xs pb-2">
+                <input
+                  type="checkbox"
+                  checked={item.is_wasted}
+                  onChange={(e) => updateItem(idx, 'is_wasted', e.target.checked)}
+                />
+                报废
+              </label>
+            )}
+          </ItemRowEditor>
+          <Input placeholder="备注" value={header.note}
+            onChange={(e) => setHeader({ ...header, note: e.target.value })} />
+        </div>
+      </OrderFormModal>
+
+      <OrderDetailModal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title={`退货单 #${detail?.id}`}
+        headerInfo={
+          <>
+            <div>客户: {detail?.customer_name}</div>
+            {detail?.source_type && (
+              <div>来源: {detail.source_type} #{detail.source_order_id}</div>
+            )}
+            <div>退款: ¥{detail?.total_refund?.toFixed(2)}</div>
+          </>
+        }
+        items={detail?.items || []}
+        status={detail?.status}
+        statusConfig={returnStatusConfig}
+      >
+        {detail?.status === 'confirmed' && (
+          <Button size="sm" variant="danger" onClick={handleCancel}>撤销</Button>
+        )}
+      </OrderDetailModal>
     </div>
   );
 }

@@ -80,6 +80,8 @@ export const deliveryApi = {
 export const returnApi = {
   create: (data: any) => api.post('/returns', data).then(r => r.data),
   list: () => api.get('/returns').then(r => r.data),
+  get: (id: number) => api.get(`/returns/${id}`).then(r => r.data),
+  cancel: (id: number) => api.post(`/returns/${id}/cancel`).then(r => r.data),
 };
 
 // Wastage
