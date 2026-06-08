@@ -55,15 +55,10 @@ def seed_data(db_session):
     s1 = Supplier(name="蒙牛代理")
     db_session.add(s1)
 
-    sh1 = Shelf(name="仓库A区")
-    sh2 = Shelf(name="门店货架")
-    db_session.add_all([sh1, sh2])
-
     db_session.commit()
 
     return {
         "products": [p1, p2],
         "customers": [c1, c2],
         "suppliers": [s1],
-        "shelves": [sh1, sh2],
     }
