@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.repositories.delivery_repo import DeliveryRepository
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
+from app.models.delivery import Delivery
 from app.schemas.delivery import DeliveryCreate, ExchangeCreate
 
 
@@ -13,6 +14,10 @@ class DeliveryService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
+    def _next_order_number(self) -> str:
+        from app.services.order_number import next_order_number
+        return next_order_number(self.db, Delivery, "DO")
+
     def list_with_amounts(self, customer_id=None, status=None):
         deliveries = self.delivery_repo.list_all(customer_id, status)
         if not deliveries:
@@ -22,6 +27,7 @@ class DeliveryService:
         return [
             {
                 "id": d.id,
+                "order_number": d.order_number,
                 "customer_id": d.customer_id,
                 "delivery_date": str(d.delivery_date),
                 "status": d.status,
@@ -45,20 +51,18 @@ class DeliveryService:
             subscription_order_id=data.subscription_order_id,
             note=data.note,
         )
+        delivery.order_number = self._next_order_number()
 
         total = 0.0
         movements = []
         for item in data.items:
-            unit_price = 0.0 if item.is_promo else item.unit_price
-            amount = item.quantity * unit_price
-            if not item.is_promo:
-                total += amount
+            total += item.quantity * item.unit_price
             movements.append({
                 "product_id": item.product_id,
                 "direction": "out",
                 "reason": "distribution",
                 "quantity": item.quantity,
-                "unit_price": unit_price,
+                "unit_price": item.unit_price,
                 "delivery_id": delivery.id,
             })
 
@@ -72,29 +76,19 @@ class DeliveryService:
                 delivery_id=delivery.id,
             )
 
-        # promo 成本
-        for item in data.items:
-            if item.is_promo:
-                from app.models.product import Product
-                product = self.db.query(Product).filter(Product.id == item.product_id).first()
-                if product and product.default_purchase_price > 0:
-                    self.txn_repo.create(
-                        customer_id=data.customer_id,
-                        category="promo",
-                        amount=-(item.quantity * product.default_purchase_price),
-                        delivery_id=delivery.id,
-                    )
-
         delivery.status = "delivered"
         self.db.commit()
         return {"id": delivery.id, "total": total}
 
     def get_delivery_detail(self, delivery_id: int):
+        from app.models.product import Product
+
         delivery = self.delivery_repo.get_by_id(delivery_id)
         if not delivery:
             return None
         movements = self.stock_repo.get_by_delivery(delivery_id)
         transactions = self.txn_repo.get_by_delivery(delivery_id)
+        products = {p.id: p.name for p in self.db.query(Product).all()}
 
         delivery_total = sum(t.amount for t in transactions if t.category in ("distribution", "delivery"))
         delivery_cancel_total = sum(t.amount for t in transactions if t.category == "delivery_cancel")
@@ -124,11 +118,20 @@ class DeliveryService:
 
         return {
             "id": delivery.id,
+            "order_number": delivery.order_number,
             "customer_id": delivery.customer_id,
             "delivery_date": str(delivery.delivery_date),
             "status": delivery.status,
             "note": delivery.note,
-            "items": [{"product_id": m.product_id, "quantity": m.quantity, "reason": m.reason, "direction": m.direction} for m in movements if m.reason != "exchange"],
+            "items": [
+                {
+                    "product_id": m.product_id,
+                    "product_name": products.get(m.product_id, ""),
+                    "quantity": m.quantity,
+                    "unit_price": m.unit_price or 0,
+                }
+                for m in movements if m.reason != "exchange"
+            ],
             "total_amount": net,
             "paid_amount": paid_total,
             "unpaid_amount": net - paid_total,

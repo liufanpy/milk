@@ -16,24 +16,26 @@ class SaleService:
         self.txn_repo = TransactionRepository(db)
         self.retail_repo = RetailOrderRepository(db)
 
+    def _next_order_number(self) -> str:
+        from app.services.order_number import next_order_number
+        return next_order_number(self.db, RetailOrder, "RO")
+
     def create_sale(self, data: SaleCreate):
         self.stock_repo.validate_stock(data.items)
 
         retail_order = self.retail_repo.create(customer_id=data.customer_id)
+        retail_order.order_number = self._next_order_number()
 
         total = 0.0
         movements = []
         for item in data.items:
-            unit_price = 0.0 if item.is_promo else item.unit_price
-            amount = item.quantity * unit_price
-            if not item.is_promo:
-                total += amount
+            total += item.quantity * item.unit_price
             movements.append({
                 "product_id": item.product_id,
                 "direction": "out",
                 "reason": "retail",
                 "quantity": item.quantity,
-                "unit_price": unit_price,
+                "unit_price": item.unit_price,
                 "retail_order_id": retail_order.id,
             })
 
@@ -48,16 +50,15 @@ class SaleService:
                 retail_order_id=retail_order.id,
             )
 
-        # cogs + promo 成本
+        # cogs 成本
         product_ids = list({item.product_id for item in data.items})
         costs = {p.id: p.default_purchase_price for p in self.db.query(Product).filter(Product.id.in_(product_ids)).all()}
         for item in data.items:
             cost = costs.get(item.product_id, 0)
             if cost > 0:
-                category = "promo" if item.is_promo else "cogs"
                 self.txn_repo.create(
                     customer_id=data.customer_id,
-                    category=category,
+                    category="cogs",
                     amount=-(item.quantity * cost),
                     retail_order_id=retail_order.id,
                 )
@@ -121,6 +122,7 @@ class SaleService:
 
             result.append({
                 "id": o.id,
+                "order_number": o.order_number,
                 "customer_id": o.customer_id,
                 "customer_name": customers.get(o.customer_id, "散客") if o.customer_id else "散客",
                 "item_count": len(items),
@@ -160,6 +162,7 @@ class SaleService:
 
         return {
             "id": order.id,
+            "order_number": order.order_number,
             "customer_id": order.customer_id,
             "customer_name": customers.get(order.customer_id, "散客") if order.customer_id else "散客",
             "item_count": len(items),
@@ -170,6 +173,46 @@ class SaleService:
             "items": [item_dict(m) for m in items],
             "created_at": str(order.created_at),
         }
+
+    def mark_paid(self, order_id: int):
+        order = self.retail_repo.get_by_id(order_id)
+        if not order:
+            raise ValueError("销售记录不存在")
+        if order.status == "cancelled":
+            raise ValueError("已撤销的销售无法收款")
+
+        # 查是否已有 payment
+        existing = (
+            self.db.query(Transaction)
+            .filter(
+                Transaction.retail_order_id == order_id,
+                Transaction.category == "payment",
+            )
+            .first()
+        )
+        if existing:
+            return {"id": order.id, "paid": True}
+
+        # 查收入金额
+        income = (
+            self.db.query(Transaction)
+            .filter(
+                Transaction.retail_order_id == order_id,
+                Transaction.category == "retail",
+            )
+            .first()
+        )
+        if not income:
+            raise ValueError("未找到收入记录")
+
+        self.txn_repo.create(
+            customer_id=order.customer_id,
+            category="payment",
+            amount=income.amount,
+            retail_order_id=order_id,
+        )
+        self.db.commit()
+        return {"id": order.id, "paid": True}
 
     def cancel_sale(self, order_id: int):
         order = self.retail_repo.get_by_id(order_id)

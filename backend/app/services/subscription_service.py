@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.repositories.subscription_order_repo import SubscriptionOrderRepository
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
+from app.models.subscription_order import SubscriptionOrder
 from app.schemas.subscription import SubscriptionCreate, SubscriptionDeduct
 
 
@@ -12,6 +13,10 @@ class SubscriptionService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
+    def _next_order_number(self) -> str:
+        from app.services.order_number import next_order_number
+        return next_order_number(self.db, SubscriptionOrder, "SO")
+
     def create_order(self, data: SubscriptionCreate):
         order = self.sub_repo.create(
             customer_id=data.customer_id,
@@ -20,6 +25,7 @@ class SubscriptionService:
             note=data.note,
             status="active",
         )
+        order.order_number = self._next_order_number()
         if data.is_paid:
             self.txn_repo.create(
                 customer_id=data.customer_id,

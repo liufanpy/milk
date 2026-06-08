@@ -16,15 +16,18 @@ def parse_csv(file_content: bytes, validate_row: Callable, allowed_headers: list
     if not reader.fieldnames:
         return {"headers": [], "rows": [], "summary": {"total": 0, "ok": 0, "error": 0}}
 
-    # 过滤空表头
-    headers = [h.strip() for h in reader.fieldnames if h and h.strip()]
+    # 按 allowed_headers 过滤，只保留系统识别的列
+    raw_headers = [h.strip() for h in (reader.fieldnames or []) if h and h.strip()]
+    allowed_set = set(allowed_headers)
+    headers = [h for h in raw_headers if h in allowed_set]
 
     rows = []
     ok = 0
     error = 0
     for idx, raw_row in enumerate(reader):
-        # 跳过全空行
         row = {k.strip(): (v or "").strip() for k, v in raw_row.items() if k and k.strip()}
+        # 只保留 allowed_headers 中的列
+        row = {k: v for k, v in row.items() if k in allowed_set}
         if not any(v for v in row.values()):
             continue
 

@@ -7,6 +7,7 @@ class SubscriptionOrder(Base):
     __tablename__ = "subscription_orders"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    order_number = Column(String(20), nullable=True, unique=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     paid_amount = Column(Float, nullable=False)
     remaining_amount = Column(Float, nullable=False)

@@ -3,6 +3,7 @@ from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.repositories.wastage_order_repo import WastageOrderRepository
 from app.schemas.wastage import WastageCreate, VALID_REASONS
+from app.models.wastage_order import WastageOrder
 from app.models.product import Product
 
 
@@ -13,6 +14,10 @@ class WastageService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
+    def _next_order_number(self) -> str:
+        from app.services.order_number import next_order_number
+        return next_order_number(self.db, WastageOrder, "WO")
+
     def create_wastage(self, data: WastageCreate):
         for item in data.items:
             if item.reason not in VALID_REASONS:
@@ -21,6 +26,7 @@ class WastageService:
         self.stock_repo.validate_stock(data.items)
 
         order = self.wastage_repo.create(note=data.note)
+        order.order_number = self._next_order_number()
 
         product_ids = list({item.product_id for item in data.items})
         costs = {p.id: p.default_purchase_price for p in self.db.query(Product).filter(Product.id.in_(product_ids)).all()}
@@ -84,6 +90,7 @@ class WastageService:
 
             result.append({
                 "id": o.id,
+                "order_number": o.order_number,
                 "item_count": len(items),
                 "reasons": reasons,
                 "items_summary": summary,
@@ -115,6 +122,7 @@ class WastageService:
 
         return {
             "id": order.id,
+            "order_number": order.order_number,
             "note": order.note,
             "status": order.status,
             "item_count": len(items),

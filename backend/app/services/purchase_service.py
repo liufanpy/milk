@@ -1,14 +1,14 @@
 from datetime import datetime, date
+import json
 from sqlalchemy.orm import Session
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.schemas.purchase import PurchaseCreate
 from app.models.purchase_order import PurchaseOrder
 from app.models.product import Product
-from app.models.shelf import Shelf
 from app.models.supplier import Supplier
 
-PURCHASE_HEADERS = ["产品名称", "product_name", "数量", "quantity", "进价", "unit_price", "货架名称", "shelf_name", "供应商名称", "supplier_name", "日期", "date"]
+PURCHASE_HEADERS = ["产品名称", "product_name", "数量", "quantity", "进价", "unit_price", "供应商名称", "supplier_name", "日期", "date"]
 
 DATE_FORMATS = ["%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S"]
 
@@ -31,24 +31,14 @@ class PurchaseService:
     # ── 单号生成 ──────────────────────────────────
 
     def _next_order_number(self) -> str:
-        today = date.today().strftime("%Y%m%d")
-        prefix = f"PO-{today}-"
-        last = (
-            self.db.query(PurchaseOrder)
-            .filter(PurchaseOrder.order_number.like(f"{prefix}%"))
-            .order_by(PurchaseOrder.id.desc())
-            .first()
-        )
-        if last:
-            seq = int(last.order_number.split("-")[-1]) + 1
-        else:
-            seq = 1
-        return f"{prefix}{seq:03d}"
+        from app.services.order_number import next_order_number
+        return next_order_number(self.db, PurchaseOrder, "PO")
 
     # ── 创建进货单 ────────────────────────────────
 
     def create_purchase(self, data: PurchaseCreate):
         total = sum(item.quantity * item.unit_price for item in data.items)
+        items_data = [{"product_id": it.product_id, "quantity": it.quantity, "unit_price": it.unit_price} for it in data.items]
         order = PurchaseOrder(
             order_number=self._next_order_number(),
             supplier_id=data.supplier_id,
@@ -56,6 +46,7 @@ class PurchaseService:
             total_amount=total,
             note=data.note,
             status=data.status,
+            _items_json=json.dumps(items_data, ensure_ascii=False),
         )
         self.db.add(order)
         self.db.flush()
@@ -133,6 +124,12 @@ class PurchaseService:
         if order.status == "confirmed":
             # 反向冲抵库存
             original_items = self.stock_repo.get_by_purchase_order(order_id)
+            # 校验：已出库的商品不能撤销
+            inventory = {r.product_id: r.stock for r in self.stock_repo.get_inventory()}
+            for item in original_items:
+                stock = inventory.get(item.product_id, 0)
+                if stock < item.quantity:
+                    raise ValueError(f"该进货单商品已被部分售出，库存不足，无法撤销")
             reverses = []
             reverse_total = 0.0
             for item in original_items:
@@ -195,7 +192,29 @@ class PurchaseService:
         products = {p.id: p.name for p in self.db.query(Product).all()}
         suppliers = {s.id: s.name for s in self.db.query(Supplier).all()}
 
+        # 草稿无 stock_movement，从 _items_json 读取
+        if not items and order._items_json:
+            try:
+                raw = json.loads(order._items_json)
+                items = []
+                for r in raw:
+                    items.append({
+                        "product_id": r["product_id"],
+                        "product_name": products.get(r["product_id"], ""),
+                        "quantity": r["quantity"],
+                        "unit_price": r["unit_price"],
+                    })
+            except (json.JSONDecodeError, KeyError):
+                items = []
+
         def item_dir(i):
+            if isinstance(i, dict):
+                return {
+                    "product_id": i["product_id"],
+                    "product_name": i.get("product_name", products.get(i["product_id"], "")),
+                    "quantity": i["quantity"],
+                    "unit_price": i["unit_price"],
+                }
             return {
                 "product_id": i.product_id,
                 "product_name": products.get(i.product_id, ""),
@@ -219,16 +238,14 @@ class PurchaseService:
     # ── CSV 导入（保持兼容，直接创建 confirmed 单） ──
 
     DFLT_SUPPLIER = "金健牛奶"
-    DFLT_SHELF = "小欢的牛奶店"
 
     def _name_maps(self):
         prods = {p.name: (p.id, p.default_purchase_price) for p in self.db.query(Product).all()}
-        shelves = {s.name: s.id for s in self.db.query(Shelf).all()}
         suppliers = {s.name: s.id for s in self.db.query(Supplier).all()}
-        return prods, shelves, suppliers
+        return prods, suppliers
 
     def import_preview(self, file_content: bytes) -> dict:
-        prods, shelves, suppliers = self._name_maps()
+        prods, suppliers = self._name_maps()
 
         def validate(row: dict) -> str | bool:
             pname = (row.get("产品名称") or row.get("product_name") or "").strip()
@@ -242,9 +259,6 @@ class PurchaseService:
                     return "数量必须大于0"
             except ValueError:
                 return "数量格式错误"
-            sname = (row.get("货架名称") or row.get("shelf_name") or "").strip() or self.DFLT_SHELF
-            if sname not in shelves:
-                return f"货架'{sname}'不存在"
             supname = (row.get("供应商名称") or row.get("supplier_name") or "").strip() or self.DFLT_SUPPLIER
             if supname not in suppliers:
                 return f"供应商'{supname}'不存在"
@@ -254,7 +268,7 @@ class PurchaseService:
         return parse_csv(file_content, validate, PURCHASE_HEADERS)
 
     def import_confirm(self, rows: list[dict]) -> dict:
-        prods, shelves, suppliers = self._name_maps()
+        prods, suppliers = self._name_maps()
         success = 0
         errors: list[dict] = []
 

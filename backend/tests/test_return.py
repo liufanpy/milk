@@ -24,44 +24,41 @@ class TestReturnCreate:
         assert stock is not None
         assert stock["stock"] == 2
 
-    def test_create_return_with_source_tracking(self, client, seed_data):
-        """退货关联来源零售单"""
+    def test_create_return_generates_order_number(self, client, seed_data):
+        """退货单自动生成单号"""
         c = seed_data["customers"][0]
         p = seed_data["products"][0]
 
         resp = client.post("/api/returns", json={
             "customer_id": c.id,
-            "source_type": "retail",
-            "source_order_id": 99,
             "items": [
                 {"product_id": p.id, "quantity": 1, "unit_price": 45},
             ],
         })
 
         assert resp.status_code == 201
-        # 验证详情中有来源信息
         order_id = resp.json()["id"]
         detail = client.get(f"/api/returns/{order_id}").json()
-        assert detail["source_type"] == "retail"
-        assert detail["source_order_id"] == 99
+        assert detail["order_number"] is not None
+        assert detail["order_number"].startswith("RT")
 
-    def test_create_return_with_wasted_item(self, client, seed_data):
-        """退货且报废：入库 + 同时出库（库存净增为 0）"""
+    def test_create_return_writes_stock_in(self, client, seed_data):
+        """退货入库：库存增加"""
         c = seed_data["customers"][0]
         p = seed_data["products"][0]
 
         resp = client.post("/api/returns", json={
             "customer_id": c.id,
             "items": [
-                {"product_id": p.id, "quantity": 3, "unit_price": 45, "is_wasted": True},
+                {"product_id": p.id, "quantity": 3, "unit_price": 45},
             ],
         })
 
         assert resp.status_code == 201
-        # 报废的退货：入库 3 + 出库 3 = 净增 0
         inventory = client.get("/api/inventory").json()
         stock = next((r for r in inventory if r["product_id"] == p.id), None)
-        assert stock is None or stock["stock"] == 0
+        assert stock is not None
+        assert stock["stock"] == 3
 
 
 class TestReturnListAndDetail:
@@ -81,6 +78,7 @@ class TestReturnListAndDetail:
         assert isinstance(data, list)
         assert len(data) >= 1
         order = data[0]
+        assert "order_number" in order
         assert "customer_name" in order
         assert "items_summary" in order
         assert "total_refund" in order

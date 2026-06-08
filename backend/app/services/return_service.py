@@ -16,13 +16,16 @@ class ReturnService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
+    def _next_order_number(self) -> str:
+        from app.services.order_number import next_order_number
+        return next_order_number(self.db, ReturnOrder, "RT")
+
     def create_return(self, data: ReturnCreate):
         order = self.return_repo.create(
             customer_id=data.customer_id,
-            source_type=data.source_type,
-            source_order_id=data.source_order_id,
             note=data.note,
         )
+        order.order_number = self._next_order_number()
 
         refund_total = 0.0
         for item in data.items:
@@ -35,16 +38,6 @@ class ReturnService:
                 "unit_price": item.unit_price,
                 "return_order_id": order.id,
             }])
-            # 如果产品已报废，额外做一条出库
-            if item.is_wasted:
-                self.stock_repo.bulk_create([{
-                    "product_id": item.product_id,
-                    "direction": "out",
-                    "reason": "wastage",
-                    "quantity": item.quantity,
-                    "unit_price": item.unit_price,
-                    "return_order_id": order.id,
-                }])
             refund_total += item.quantity * item.unit_price
 
         # 退款
@@ -103,10 +96,9 @@ class ReturnService:
 
             result.append({
                 "id": o.id,
+                "order_number": o.order_number,
                 "customer_id": o.customer_id,
                 "customer_name": customers.get(o.customer_id, ""),
-                "source_type": o.source_type,
-                "source_order_id": o.source_order_id,
                 "item_count": len(items),
                 "total_refund": refunds.get(o.id, 0),
                 "note": o.note,
@@ -145,10 +137,9 @@ class ReturnService:
 
         return {
             "id": order.id,
+            "order_number": order.order_number,
             "customer_id": order.customer_id,
             "customer_name": customers.get(order.customer_id, ""),
-            "source_type": order.source_type,
-            "source_order_id": order.source_order_id,
             "item_count": len(items),
             "total_refund": total_refund,
             "note": order.note,
@@ -170,6 +161,13 @@ class ReturnService:
 
         # 查原始记录
         original_items = self.stock_repo.get_by_return_order(order_id)
+        # 校验：已重新售出的退货不能撤销
+        inventory = {r.product_id: r.stock for r in self.stock_repo.get_inventory()}
+        for m in original_items:
+            if m.direction == "in":
+                stock = inventory.get(m.product_id, 0)
+                if stock < m.quantity:
+                    raise ValueError("退货商品已被售出，库存不足，无法撤销")
         for m in original_items:
             # 反向冲抵库存
             reverse_dir = "out" if m.direction == "in" else "in"

@@ -56,6 +56,14 @@ def get_sale(order_id: int, svc: SaleService = Depends(get_sale_service)):
     return detail
 
 
+@router.post("/{order_id}/pay")
+def mark_paid(order_id: int, svc: SaleService = Depends(get_sale_service)):
+    try:
+        return svc.mark_paid(order_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/{order_id}/cancel")
 def cancel_sale(order_id: int, svc: SaleService = Depends(get_sale_service)):
     try:

@@ -8,8 +8,7 @@ class ReturnOrder(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
-    source_type = Column(String(20), nullable=True)
-    source_order_id = Column(Integer, nullable=True)
+    order_number = Column(String(20), nullable=True, unique=True, index=True)
     note = Column(String(500), default="")
     status = Column(String(20), default="confirmed")
     created_at = Column(DateTime, default=datetime.now)

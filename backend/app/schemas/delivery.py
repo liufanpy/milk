@@ -7,7 +7,6 @@ class DeliveryCreateItem(BaseModel):
     product_id: int
     quantity: int
     unit_price: float
-    is_promo: bool = False
 
 
 class DeliveryCreate(BaseModel):
