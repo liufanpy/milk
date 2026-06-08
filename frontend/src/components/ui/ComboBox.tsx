@@ -105,7 +105,7 @@ export function ComboBox({
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex items-center border border-gray-300 rounded px-2 py-1 text-sm bg-white focus-within:ring-2 focus-within:ring-blue-500">
+      <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus-within:ring-2 focus-within:ring-blue-500">
         <input
           ref={inputRef}
           type="text"

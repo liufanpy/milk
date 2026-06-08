@@ -43,7 +43,7 @@ export default function SubscriptionsPage() {
   };
 
   const columns = [
-    { key: 'id', title: '#', render: (o: any) => `#${o.id}` },
+    { key: 'order_number', title: '单号', render: (o: any) => o.order_number || `#${o.id}` },
     { key: 'customer_name', title: '客户', render: (o: any) => customerNames[o.customer_id] || `客户#${o.customer_id}` },
     { key: 'paid_amount', title: '实付金额', render: (o: any) => `¥${o.paid_amount}` },
     { key: 'remaining_amount', title: '剩余金额', render: (o: any) => <span className="font-medium">¥{o.remaining_amount}</span> },

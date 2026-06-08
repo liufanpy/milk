@@ -67,14 +67,18 @@ export default function WastagePage() {
 
   const handleCancel = async () => {
     if (!detail || !confirm('确定撤销此损耗单？将恢复库存')) return;
-    await wastageApi.cancel(detail.id);
-    alert('已撤销');
-    setDetailOpen(false);
-    loadRecords();
+    try {
+      await wastageApi.cancel(detail.id);
+      alert('已撤销');
+      setDetailOpen(false);
+      loadRecords();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '撤销失败');
+    }
   };
 
   const columns = [
-    { key: 'id', title: '#', render: (r: any) => `#${r.id}` },
+    { key: 'order_number', title: '单号', render: (r: any) => r.order_number || `#${r.id}` },
     { key: 'items_summary', title: '品项' },
     { key: 'reasons', title: '原因', render: (r: any) => r.reasons?.map((s: string) => REASON_LABELS[s] || s).join('、') },
     {

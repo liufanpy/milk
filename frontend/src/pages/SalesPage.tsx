@@ -13,7 +13,6 @@ interface ItemRow {
   product_id: number;
   quantity: number;
   unit_price: number;
-  is_promo: boolean;
 }
 
 const saleStatusConfig = {
@@ -25,7 +24,7 @@ const saleStatusConfig = {
 export default function SalesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [customerId, setCustomerId] = useState<number | string>('');
-  const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
+  const [items, setItems] = useState<ItemRow[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
   const [paid, setPaid] = useState(true);
   const [note, setNote] = useState('');
 
@@ -66,10 +65,10 @@ export default function SalesPage() {
         paid,
         note,
       });
-      alert('销售成功');
+      alert('创建成功');
       setFormOpen(false);
       setCustomerId('');
-      setItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
+      setItems([{ product_id: 0, quantity: 1, unit_price: 0 }]);
       setPaid(true);
       setNote('');
       refreshSales();
@@ -84,10 +83,20 @@ export default function SalesPage() {
     setDetailOpen(true);
   };
 
-  const handleCancel = async (orderId: number) => {
-    if (!confirm('确定撤销此销售记录？（将反向冲抵库存和账务）')) return;
-    await saleApi.cancel(orderId);
+  const handlePay = async (orderId: number) => {
+    if (!confirm('确认已收到款项？')) return;
+    await saleApi.pay(orderId);
     refreshSales();
+  };
+
+  const handleCancel = async (orderId: number) => {
+    if (!confirm('确定撤销此零售记录？（将反向冲抵库存和账务）')) return;
+    try {
+      await saleApi.cancel(orderId);
+      refreshSales();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '撤销失败');
+    }
   };
 
   const getSaleStatus = (s: any) => {
@@ -96,6 +105,7 @@ export default function SalesPage() {
   };
 
   const columns = [
+    { key: 'order_number', title: '单号', render: (s: any) => s.order_number || `#${s.id}` },
     { key: 'customer_name', title: '客户' },
     { key: 'items_summary', title: '品项' },
     {
@@ -112,10 +122,10 @@ export default function SalesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">直接销售（零售/自取）</h2>
+        <h2 className="text-xl font-bold">零售</h2>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => window.open('/api/sales/export')}>导出 CSV</Button>
-          <Button onClick={() => setFormOpen(true)}>+ 新建销售</Button>
+          <Button onClick={() => setFormOpen(true)}>+ 新建零售</Button>
         </div>
       </div>
 
@@ -129,9 +139,9 @@ export default function SalesPage() {
       <OrderFormModal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title="新建销售单"
+        title="新建零售单"
         onSubmit={handleSubmit}
-        submitLabel="提交销售"
+        submitLabel="提交零售"
       >
         <div className="space-y-3">
           <div>
@@ -143,20 +153,9 @@ export default function SalesPage() {
             onUpdate={updateItem}
             onProductChange={onProductChange}
             onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
-            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }])}
+            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0 }])}
             onlyInStock
-          >
-            {(item, idx) => (
-              <label className="flex items-center gap-1 text-xs pb-2">
-                <input
-                  type="checkbox"
-                  checked={item.is_promo}
-                  onChange={(e) => updateItem(idx, 'is_promo', e.target.checked)}
-                />
-                赠送
-              </label>
-            )}
-          </ItemRowEditor>
+          />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
             已收款
@@ -168,7 +167,7 @@ export default function SalesPage() {
       <OrderDetailModal
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
-        title={`销售单 #${detail?.id}`}
+        title={`零售单 #${detail?.id}`}
         headerInfo={
           <>
             <div>客户: {detail?.customer_name || '散客'}</div>
@@ -182,7 +181,12 @@ export default function SalesPage() {
         statusConfig={saleStatusConfig}
       >
         {detail?.status === 'confirmed' && (
-          <Button size="sm" variant="danger" onClick={() => { handleCancel(detail.id); setDetailOpen(false); }}>撤销此单</Button>
+          <div className="flex gap-2">
+            {!detail?.paid && (
+              <Button size="sm" onClick={() => { handlePay(detail.id); setDetailOpen(false); }}>确认收款</Button>
+            )}
+            <Button size="sm" variant="danger" onClick={() => { handleCancel(detail.id); setDetailOpen(false); }}>撤销此单</Button>
+          </div>
         )}
       </OrderDetailModal>
     </div>

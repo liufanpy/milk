@@ -64,6 +64,7 @@ export const saleApi = {
   create: (data: any) => api.post('/sales', data).then(r => r.data),
   list: () => api.get('/sales').then(r => r.data),
   get: (id: number) => api.get(`/sales/${id}`).then(r => r.data),
+  pay: (id: number) => api.post(`/sales/${id}/pay`).then(r => r.data),
   cancel: (id: number) => api.post(`/sales/${id}/cancel`).then(r => r.data),
 };
 
@@ -112,4 +113,10 @@ export const dashboardApi = {
   getReceivables: () => api.get('/receivables').then(r => r.data),
   getInventory: () => api.get('/inventory').then(r => r.data),
   getOperationLogs: () => api.get('/operation-logs').then(r => r.data),
+};
+
+// Ledger queries
+export const ledgerApi = {
+  stock: (params?: any) => api.get('/stock-ledger', { params }).then(r => r.data),
+  transactions: (params?: any) => api.get('/transaction-ledger', { params }).then(r => r.data),
 };

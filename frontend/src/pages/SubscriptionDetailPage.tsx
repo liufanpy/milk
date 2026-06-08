@@ -144,7 +144,15 @@ export default function SubscriptionDetailPage() {
             <div key={idx} className="flex gap-2 items-end">
               <div className="flex-1">
                 <label className="text-xs text-gray-500">产品</label>
-                <ProductSelect value={item.product_id} onChange={(v) => updateDeductItem(idx, 'product_id', v)} onlyInStock />
+                <ProductSelect value={item.product_id} onChange={async (v) => {
+                  updateDeductItem(idx, 'product_id', v);
+                  if (v && order?.customer_id) {
+                    try {
+                      const { price } = await customerApi.resolvePrice(order.customer_id, v);
+                      updateDeductItem(idx, 'unit_price', price);
+                    } catch {}
+                  }
+                }} onlyInStock />
               </div>
               <div className="w-20">
                 <label className="text-xs text-gray-500">数量</label>

@@ -37,7 +37,10 @@ export default function PurchasesPage() {
   const [detail, setDetail] = useState<PurchaseOrderDetail | null>(null);
 
   useEffect(() => {
-    supplierApi.list().then(setSuppliers);
+    supplierApi.list().then((data: any) => {
+      setSuppliers(data);
+      if (data.length === 1) setSupplierId(data[0].id);
+    });
     productApi.list().then((data: any) => setProducts(data));
     purchaseApi.list().then(setOrders);
   }, []);
@@ -89,8 +92,12 @@ export default function PurchasesPage() {
   const handleCancel = async (orderId: number, status: string) => {
     const msg = status === 'draft' ? '确定作废此草稿？' : '确定撤销此进货单？（将反向冲抵库存）';
     if (!confirm(msg)) return;
-    await purchaseApi.cancel(orderId);
-    refreshOrders();
+    try {
+      await purchaseApi.cancel(orderId);
+      refreshOrders();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '撤销失败');
+    }
   };
 
   const openDetail = async (orderId: number) => {
@@ -138,7 +145,7 @@ export default function PurchasesPage() {
         onClose={() => setFormOpen(false)}
         title="新建进货单"
         onSubmit={() => {}}
-        submitLabel=""
+        hideFooter
       >
         <div className="space-y-3">
           <div className="flex gap-4">

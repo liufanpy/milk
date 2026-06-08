@@ -21,7 +21,7 @@ export default function DashboardPage() {
       <h2 className="text-xl font-bold mb-4">经营看板</h2>
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-gray-500">今日销售</div>
+          <div className="text-sm text-gray-500">今日零售</div>
           <div className="text-2xl font-bold text-green-600">¥{data?.today_sales || 0}</div>
         </div>
         <div className="bg-white rounded-lg border p-4">

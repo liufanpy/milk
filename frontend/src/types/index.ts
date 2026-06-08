@@ -107,14 +107,12 @@ export interface SaleItem {
   product_id: number;
   quantity: number;
   unit_price: number;
-  is_promo?: boolean;
 }
 
 export interface DeliveryCreateItem {
   product_id: number;
   quantity: number;
   unit_price: number;
-  is_promo?: boolean;
 }
 
 export interface PurchaseItem {

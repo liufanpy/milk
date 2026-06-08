@@ -128,7 +128,7 @@ export default function CsvImportModal({ open, onClose, title, onImport, onConfi
                     </td>
                     <td className="px-2 py-1 text-gray-400">{row.index + 1}</td>
                     {headers.slice(0, 6).map(h => (
-                      <td key={h} className="px-2 py-1 max-w-[120px] truncate">{row.data[h] || ''}</td>
+                      <td key={h} className="px-2 py-1 whitespace-nowrap">{row.data[h] || ''}</td>
                     ))}
                     <td className="px-2 py-1">
                       {row.status === 'error' ? <span className="text-red-500 text-xs" title={row.msg}>{row.msg}</span> : <Badge variant="success">OK</Badge>}

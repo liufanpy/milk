@@ -7,12 +7,14 @@ const navItems = [
   { to: '/customers', label: '客户' },
   { to: '/suppliers', label: '供应商' },
   { to: '/purchases', label: '进货' },
-  { to: '/sales', label: '销售' },
+  { to: '/sales', label: '零售' },
   { to: '/deliveries', label: '送货单' },
   { to: '/returns', label: '退货' },
   { to: '/wastage', label: '损耗' },
   { to: '/subscriptions', label: '订奶' },
   { to: '/inventory', label: '库存' },
+  { to: '/stock-ledger', label: '库存流水' },
+  { to: '/transaction-ledger', label: '资金流水' },
   { to: '/logs', label: '日志' },
 ];
 

@@ -13,13 +13,10 @@ interface ReturnItem {
   product_id: number;
   quantity: number;
   unit_price: number;
-  is_wasted: boolean;
 }
 
 const defaultForm = {
   customer_id: '' as number | string,
-  source_type: '' as string,
-  source_order_id: '' as string,
   note: '',
 };
 
@@ -33,7 +30,7 @@ export default function ReturnsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [header, setHeader] = useState(defaultForm);
   const [items, setItems] = useState<ReturnItem[]>([
-    { product_id: 0, quantity: 1, unit_price: 0, is_wasted: false },
+    { product_id: 0, quantity: 1, unit_price: 0 },
   ]);
 
   // 列表
@@ -63,15 +60,13 @@ export default function ReturnsPage() {
     try {
       await returnApi.create({
         customer_id: Number(header.customer_id),
-        source_type: header.source_type || null,
-        source_order_id: header.source_order_id ? Number(header.source_order_id) : null,
         items,
         note: header.note,
       });
       alert('退货成功');
       setFormOpen(false);
       setHeader(defaultForm);
-      setItems([{ product_id: 0, quantity: 1, unit_price: 0, is_wasted: false }]);
+      setItems([{ product_id: 0, quantity: 1, unit_price: 0 }]);
       loadReturns();
     } catch (err: any) {
       alert(err?.response?.data?.detail || '创建失败');
@@ -86,14 +81,18 @@ export default function ReturnsPage() {
 
   const handleCancel = async () => {
     if (!detail || !confirm('确定撤销此退货单？将反向冲抵库存和退款')) return;
-    await returnApi.cancel(detail.id);
-    alert('已撤销');
-    setDetailOpen(false);
-    loadReturns();
+    try {
+      await returnApi.cancel(detail.id);
+      alert('已撤销');
+      setDetailOpen(false);
+      loadReturns();
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || '撤销失败');
+    }
   };
 
   const columns = [
-    { key: 'id', title: '#', render: (r: any) => `#${r.id}` },
+    { key: 'order_number', title: '单号', render: (r: any) => r.order_number || `#${r.id}` },
     { key: 'customer_name', title: '客户' },
     { key: 'items_summary', title: '品项' },
     {
@@ -130,23 +129,6 @@ export default function ReturnsPage() {
       >
         <div className="space-y-3">
           <CustomerSelect value={header.customer_id} onChange={(v) => setHeader({ ...header, customer_id: v })} />
-          <div className="grid grid-cols-2 gap-3">
-            <select
-              value={header.source_type}
-              onChange={(e) => setHeader({ ...header, source_type: e.target.value })}
-              className="border rounded px-3 py-2 text-sm"
-            >
-              <option value="">不关联来源</option>
-              <option value="delivery">送货单</option>
-              <option value="retail">零售单</option>
-              <option value="subscription">订奶单</option>
-            </select>
-            <Input
-              placeholder="来源单号"
-              value={header.source_order_id}
-              onChange={(e) => setHeader({ ...header, source_order_id: e.target.value })}
-            />
-          </div>
           <ItemRowEditor
             items={items}
             onUpdate={updateItem}
@@ -159,19 +141,8 @@ export default function ReturnsPage() {
               }
             }}
             onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
-            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_wasted: false }])}
-          >
-            {(item, idx) => (
-              <label className="flex items-center gap-1 text-xs pb-2">
-                <input
-                  type="checkbox"
-                  checked={item.is_wasted}
-                  onChange={(e) => updateItem(idx, 'is_wasted', e.target.checked)}
-                />
-                报废
-              </label>
-            )}
-          </ItemRowEditor>
+            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0 }])}
+          />
           <Input placeholder="备注" value={header.note}
             onChange={(e) => setHeader({ ...header, note: e.target.value })} />
         </div>
@@ -184,9 +155,6 @@ export default function ReturnsPage() {
         headerInfo={
           <>
             <div>客户: {detail?.customer_name}</div>
-            {detail?.source_type && (
-              <div>来源: {detail.source_type} #{detail.source_order_id}</div>
-            )}
             <div>退款: ¥{detail?.total_refund?.toFixed(2)}</div>
           </>
         }

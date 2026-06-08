@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
 import { Button } from './Button';
-import { Input } from './Input';
 import { ProductSelect } from '../business/ProductSelect';
+
+const inputCls = 'border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
 
 interface ItemRow {
   product_id: number;
@@ -33,31 +34,28 @@ export function ItemRowEditor<T extends ItemRow>({
   return (
     <div className="space-y-2">
       {items.map((item, idx) => (
-        <div key={idx} className="flex gap-2 items-end">
-          <div className="flex-1">
-            <label className="text-xs text-gray-500">产品</label>
+        <div key={idx} className="flex gap-1.5 items-end">
+          <div className="flex-1 min-w-0">
             <ProductSelect
               value={item.product_id}
               onChange={(v) => onProductChange(idx, v)}
               onlyInStock={onlyInStock}
             />
           </div>
-          <div className="w-20">
-            <label className="text-xs text-gray-500">数量</label>
-            <Input
-              type="number"
-              value={String(item.quantity)}
-              onChange={(e) => onUpdate(idx, 'quantity' as keyof T, Number(e.target.value))}
-            />
-          </div>
-          <div className="w-24">
-            <label className="text-xs text-gray-500">单价</label>
-            <Input
-              type="number"
-              value={String(item.unit_price)}
-              onChange={(e) => onUpdate(idx, 'unit_price' as keyof T, Number(e.target.value))}
-            />
-          </div>
+          <input
+            type="number"
+            className={inputCls}
+            style={{ width: '5ch' }}
+            value={String(item.quantity)}
+            onChange={(e) => onUpdate(idx, 'quantity' as keyof T, Number(e.target.value))}
+          />
+          <input
+            type="number"
+            className={inputCls}
+            style={{ width: '7ch' }}
+            value={String(item.unit_price)}
+            onChange={(e) => onUpdate(idx, 'unit_price' as keyof T, Number(e.target.value))}
+          />
           {children?.(item, idx)}
           <Button
             variant="danger"

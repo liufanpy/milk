@@ -16,7 +16,6 @@ interface DeliveryItem {
   product_id: number;
   quantity: number;
   unit_price: number;
-  is_promo: boolean;
 }
 
 const deliveryStatusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'default' }> = {
@@ -29,7 +28,7 @@ export default function DeliveriesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [customerId, setCustomerId] = useState<number | string>('');
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
-  const [items, setItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
+  const [items, setItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
   const [paid, setPaid] = useState(false);
   const [note, setNote] = useState('');
   const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
@@ -47,8 +46,8 @@ export default function DeliveriesPage() {
   const [settleAmount, setSettleAmount] = useState(0);
   const [settleOpen, setSettleOpen] = useState(false);
   const [exchangeOpen, setExchangeOpen] = useState(false);
-  const [returnItems, setReturnItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
-  const [newItems, setNewItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
+  const [returnItems, setReturnItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
+  const [newItems, setNewItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
 
   useEffect(() => {
     customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
@@ -81,7 +80,7 @@ export default function DeliveriesPage() {
         note,
       });
       alert('送货单创建成功');
-      setCustomerId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]); setNote('');
+      setCustomerId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0 }]); setNote('');
       setFormOpen(false);
       refetch();
     } catch (err: any) {
@@ -143,8 +142,8 @@ export default function DeliveriesPage() {
       });
       alert('换货成功');
       setExchangeOpen(false);
-      setReturnItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
-      setNewItems([{ product_id: 0, quantity: 1, unit_price: 0, is_promo: false }]);
+      setReturnItems([{ product_id: 0, quantity: 1, unit_price: 0 }]);
+      setNewItems([{ product_id: 0, quantity: 1, unit_price: 0 }]);
       const detail = await deliveryApi.get(selectedDelivery.id);
       setSelectedDelivery(detail);
       refetch();
@@ -160,7 +159,7 @@ export default function DeliveriesPage() {
   });
 
   const columns = [
-    { key: 'id', title: '#', render: (d: any) => `#${d.id}` },
+    { key: 'order_number', title: '单号', render: (d: any) => d.order_number || `#${d.id}` },
     { key: 'customer_name', title: '客户', render: (d: any) => customerNames[d.customer_id] || `客户#${d.customer_id}` },
     { key: 'delivery_date', title: '日期', render: (d: any) => d.delivery_date || d.created_at?.slice(0, 10) },
     {
@@ -214,20 +213,9 @@ export default function DeliveriesPage() {
             onUpdate={updateItem}
             onProductChange={onProductChange}
             onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
-            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }])}
+            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0 }])}
             onlyInStock
-          >
-            {(item, idx) => (
-              <label className="flex items-center gap-1 text-xs pb-2">
-                <input
-                  type="checkbox"
-                  checked={item.is_promo}
-                  onChange={(e) => updateItem(idx, 'is_promo', e.target.checked)}
-                />
-                赠送
-              </label>
-            )}
-          </ItemRowEditor>
+          />
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} />已收款
@@ -271,15 +259,37 @@ export default function DeliveriesPage() {
         status={selectedDelivery?.status}
         statusConfig={deliveryStatusConfig}
       >
-        <div className="flex gap-2 w-full">
-          <div className="flex-1 text-sm space-y-1">
-            <div>总金额: ¥{selectedDelivery?.total_amount}</div>
-            <div>已付: <span className="text-green-600">¥{selectedDelivery?.paid_amount}</span></div>
-            <div>未付: <span className="text-red-600 font-bold">¥{selectedDelivery?.unpaid_amount}</span></div>
-          </div>
-          <div className="flex gap-2 items-start">
-            <Button size="sm" onClick={() => { setSettleAmount(selectedDelivery?.unpaid_amount || 0); setSettleOpen(true); }}>结算</Button>
-            <Button size="sm" variant="secondary" onClick={() => setExchangeOpen(true)}>换货</Button>
+        <div className="w-full space-y-3">
+          {selectedDelivery?.exchanges?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-2">换货记录</h4>
+              {selectedDelivery.exchanges.map((ex: any, i: number) => (
+                <div key={i} className="text-sm mb-2 pl-3 border-l-2 border-gray-200">
+                  <div className="text-xs text-gray-400 mb-1">{ex.created_at}</div>
+                  {ex.return_items?.map((item: any, j: number) => (
+                    <div key={`ret-${j}`} className="text-gray-400 line-through">
+                      退回 {productNames[item.product_id] || `产品#${item.product_id}`} ×{item.quantity} ¥{item.unit_price}
+                    </div>
+                  ))}
+                  {ex.new_items?.map((item: any, j: number) => (
+                    <div key={`new-${j}`} className="text-gray-600">
+                      换入 {productNames[item.product_id] || `产品#${item.product_id}`} ×{item.quantity} ¥{item.unit_price}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 border-t pt-2">
+            <div className="flex-1 text-sm space-y-1">
+              <div>总金额: ¥{selectedDelivery?.total_amount}</div>
+              <div>已付: <span className="text-green-600">¥{selectedDelivery?.paid_amount}</span></div>
+              <div>未付: <span className="text-red-600 font-bold">¥{selectedDelivery?.unpaid_amount}</span></div>
+            </div>
+            <div className="flex gap-2 items-start">
+              <Button size="sm" onClick={() => { setSettleAmount(selectedDelivery?.unpaid_amount || 0); setSettleOpen(true); }}>结算</Button>
+              <Button size="sm" variant="secondary" onClick={() => setExchangeOpen(true)}>换货</Button>
+            </div>
           </div>
         </div>
       </OrderDetailModal>
@@ -308,7 +318,7 @@ export default function DeliveriesPage() {
                 <Button variant="danger" size="sm" onClick={() => setReturnItems(returnItems.filter((_, i) => i !== idx))} disabled={returnItems.length <= 1}>×</Button>
               </div>
             ))}
-            <Button variant="secondary" size="sm" onClick={() => setReturnItems([...returnItems, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }])}>+</Button>
+            <Button variant="secondary" size="sm" onClick={() => setReturnItems([...returnItems, { product_id: 0, quantity: 1, unit_price: 0 }])}>+</Button>
           </div>
           <div>
             <h4 className="text-sm font-medium mb-2">新品项</h4>
@@ -320,7 +330,7 @@ export default function DeliveriesPage() {
                 <Button variant="danger" size="sm" onClick={() => setNewItems(newItems.filter((_, i) => i !== idx))} disabled={newItems.length <= 1}>×</Button>
               </div>
             ))}
-            <Button variant="secondary" size="sm" onClick={() => setNewItems([...newItems, { product_id: 0, quantity: 1, unit_price: 0, is_promo: false }])}>+</Button>
+            <Button variant="secondary" size="sm" onClick={() => setNewItems([...newItems, { product_id: 0, quantity: 1, unit_price: 0 }])}>+</Button>
           </div>
           <div className="text-sm text-gray-500 pt-2 border-t">
             <div>退回合计: ¥{returnTotal.toFixed(2)}</div>

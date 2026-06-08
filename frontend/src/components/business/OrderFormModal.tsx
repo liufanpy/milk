@@ -9,6 +9,7 @@ interface OrderFormModalProps {
   onSubmit: () => void;
   isPending?: boolean;
   submitLabel?: string;
+  hideFooter?: boolean;
   children: ReactNode;
 }
 
@@ -19,16 +20,19 @@ export function OrderFormModal({
   onSubmit,
   isPending = false,
   submitLabel = '提交',
+  hideFooter = false,
   children,
 }: OrderFormModalProps) {
   return (
     <Modal open={open} onClose={onClose} title={title}>
       <div className="space-y-4">
         {children}
-        <div className="flex gap-2 pt-2 border-t">
-          <Button onClick={onSubmit} disabled={isPending}>{submitLabel}</Button>
-          <Button variant="secondary" onClick={onClose}>取消</Button>
-        </div>
+        {!hideFooter && (
+          <div className="flex gap-2 pt-2 border-t">
+            <Button onClick={onSubmit} disabled={isPending}>{submitLabel}</Button>
+            <Button variant="secondary" onClick={onClose}>取消</Button>
+          </div>
+        )}
       </div>
     </Modal>
   );
