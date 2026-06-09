@@ -395,15 +395,17 @@ class StockMovementRepository:
         )
 
     def get_store_receive_between(self, store_id: int, product_id: int, from_date, to_date) -> int:
-        """两次盘点之间的店铺收货总量"""
+        """两次盘点之间的店铺收货总量（按 delivery_date 算，不是 created_at）"""
+        from app.models.delivery import Delivery
         result = (
             self.db.query(func.sum(StockMovement.quantity))
+            .join(Delivery, (StockMovement.source_type == "delivery") & (StockMovement.source_id == Delivery.id))
             .filter(
                 StockMovement.store_id == store_id,
                 StockMovement.product_id == product_id,
                 StockMovement.reason == "store_receive",
-                StockMovement.created_at >= from_date,
-                StockMovement.created_at < to_date,
+                Delivery.delivery_date >= from_date,
+                Delivery.delivery_date < to_date,
             )
             .scalar()
         )
@@ -935,10 +937,11 @@ class DeliveryService:
             raise ValueError("换货金额不一致，请走退货结算后重新开单")
 
         now = datetime.now()
+        store_id = delivery.store_id  # 若送货到店，换货也要反映在店铺库存
 
         return_movements = []
         for item in data.return_items:
-            return_movements.append({
+            mov = {
                 "product_id": item.product_id,
                 "direction": "in",
                 "reason": "exchange",
@@ -947,13 +950,19 @@ class DeliveryService:
                 "source_type": "delivery",
                 "source_id": delivery_id,
                 "created_at": now,
-            })
+            }
+            # 总仓入库 + 店铺出库（退还给总仓）
+            if store_id:
+                return_movements.append({**mov})  # 总仓
+                return_movements.append({**mov, "direction": "out", "store_id": store_id})  # 店铺
+            else:
+                return_movements.append(mov)
         self.stock_repo.bulk_create(return_movements)
 
         self.stock_repo.validate_stock(data.new_items)
         new_movements = []
         for item in data.new_items:
-            new_movements.append({
+            mov = {
                 "product_id": item.product_id,
                 "direction": "out",
                 "reason": "exchange",
@@ -961,6 +970,14 @@ class DeliveryService:
                 "unit_price": item.unit_price,
                 "source_type": "delivery",
                 "source_id": delivery_id,
+                "created_at": now,
+            }
+            # 总仓出库 + 店铺入库（新货到店）
+            if store_id:
+                new_movements.append({**mov})  # 总仓
+                new_movements.append({**mov, "direction": "in", "store_id": store_id})  # 店铺
+            else:
+                new_movements.append(mov)
                 "created_at": now,
             })
         self.stock_repo.bulk_create(new_movements)

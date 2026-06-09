@@ -130,7 +130,7 @@ ALTER TABLE transactions ADD COLUMN store_id INTEGER REFERENCES stores(id);
 
 ```
 期初库存 = 上次盘点该店该产品的 actual_quantity
-期间进货 = 两次盘点之间 store_receive 入库量求和
+期间进货 = 两次盘点之间 store_receive 入库量求和（按送货单 delivery_date 过滤，不是 created_at）
 期末库存 = 本次录入的 actual_quantity
 销量     = 期初 + 期间进货 - 期末
 ```
