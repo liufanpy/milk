@@ -10,49 +10,43 @@ from app.models.retail_order import RetailOrder
 from app.models.return_order import ReturnOrder
 from app.models.delivery import Delivery
 from app.models.subscription_order import SubscriptionOrder
+from app.models.inventory_check import InventoryCheck
 
 router = APIRouter(prefix="/api/transaction-ledger", tags=["transaction-ledger"])
 
-_FK_MAP = [
-    ("purchase_order_id", "purchase_orders"),
-    ("retail_order_id", "retail_orders"),
-    ("return_order_id", "return_orders"),
-    ("delivery_id", "deliveries"),
-    ("subscription_order_id", "subscription_orders"),
-]
-
-_MODELS = {
-    "purchase_orders": PurchaseOrder,
-    "retail_orders": RetailOrder,
-    "return_orders": ReturnOrder,
-    "deliveries": Delivery,
-    "subscription_orders": SubscriptionOrder,
+_SOURCE_MODELS = {
+    "purchase": PurchaseOrder,
+    "retail": RetailOrder,
+    "return": ReturnOrder,
+    "delivery": Delivery,
+    "subscription": SubscriptionOrder,
+    "inventory_check": InventoryCheck,
 }
 
 
 def _order_number_map(db: Session, txns: list) -> dict:
-    ids_by_table: dict[str, set] = {}
+    ids_by_type: dict[str, set] = {}
     for t in txns:
-        for fk, table in _FK_MAP:
-            val = getattr(t, fk, None)
-            if val:
-                ids_by_table.setdefault(table, set()).add(val)
+        if t.source_type and t.source_id:
+            ids_by_type.setdefault(t.source_type, set()).add(t.source_id)
 
     result: dict[int, str] = {}
-    for table, ids in ids_by_table.items():
-        model = _MODELS[table]
+    for stype, ids in ids_by_type.items():
+        model = _SOURCE_MODELS.get(stype)
+        if not model:
+            continue
         for row in db.query(model).filter(model.id.in_(ids)).all():
             for t in txns:
-                for fk, t2 in _FK_MAP:
-                    if t2 == table and getattr(t, fk, None) == row.id:
-                        if row.order_number:
-                            result[t.id] = row.order_number
+                if t.source_type == stype and t.source_id == row.id:
+                    if row.order_number:
+                        result[t.id] = row.order_number
     return result
 
 
 @router.get("")
 def list_transaction_ledger(
     customer_id: int | None = Query(None),
+    store_id: int | None = Query(None),
     category: str | None = Query(None),
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
@@ -63,25 +57,28 @@ def list_transaction_ledger(
 
     if customer_id:
         q = q.filter(Transaction.customer_id == customer_id)
+    if store_id is not None:
+        q = q.filter(Transaction.store_id == store_id)
+    if category:
+        q = q.filter(Transaction.category == category)
     if date_from:
         q = q.filter(Transaction.created_at >= date.fromisoformat(date_from))
     if date_to:
         q = q.filter(Transaction.created_at < date.fromisoformat(date_to))
     if order_number:
         filters = []
-        for fk, table_name in _FK_MAP:
-            model = _MODELS[table_name]
+        for stype, model in _SOURCE_MODELS.items():
             matched = db.query(model.id).filter(model.order_number == order_number).all()
             if matched:
                 ids = [row[0] for row in matched]
-                col = getattr(Transaction, fk)
-                filters.append(col.in_(ids))
+                filters.append(
+                    (Transaction.source_type == stype) & (Transaction.source_id.in_(ids))
+                )
         if filters:
             from sqlalchemy import or_
             q = q.filter(or_(*filters))
         else:
             q = q.filter(Transaction.id == -1)
-        q = q.filter(Transaction.category == category)
 
     txns = q.limit(500).all()
     if not txns:
