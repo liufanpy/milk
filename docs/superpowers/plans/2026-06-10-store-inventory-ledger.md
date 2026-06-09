@@ -42,7 +42,7 @@ class Store(Base):
 ```python
 # backend/app/models/inventory_check.py
 from datetime import date, datetime
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, UniqueConstraint
 from app.database import Base
 
 
@@ -65,6 +65,10 @@ class InventoryCheckItem(Base):
     check_id = Column(Integer, ForeignKey("inventory_checks.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     actual_quantity = Column(Integer, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("check_id", "product_id", name="uq_check_product"),
+    )
 ```
 
 - [ ] **Step 3: 更新 models/__init__.py 导入**
@@ -1232,12 +1236,12 @@ def list_stock_ledger(
     products = {p.id: p.name for p in db.query(Product).all()}
     order_numbers = _order_number_map(db, movements)
 
-    balances: dict[int, dict] = {}  # product_id → {store_id or 0: balance}
+    balances: dict[int, dict] = {}  # product_id → {store_key: balance}，store_key=-1 代表总仓(NULL)
     rows = []
     for m in movements:
         key = m.product_id
         balances.setdefault(key, {})
-        store_key = m.store_id or 0
+        store_key = m.store_id if m.store_id is not None else -1
         balances[key].setdefault(store_key, 0)
         if m.direction == "in":
             balances[key][store_key] += m.quantity
@@ -1368,6 +1372,20 @@ class InventoryCheckService:
         )
         return last[0] if last else 0
 
+    def _get_last_check_date(self, store_id: int, before_date: date) -> date | None:
+        """最近一次盘点日期"""
+        last = (
+            self.db.query(InventoryCheck.check_date)
+            .filter(
+                InventoryCheck.store_id == store_id,
+                InventoryCheck.check_date < before_date,
+                InventoryCheck.status == "confirmed",
+            )
+            .order_by(InventoryCheck.check_date.desc())
+            .first()
+        )
+        return last[0] if last else None
+
     def create(self, data: InventoryCheckCreate):
         store = self.db.query(Store).filter(Store.id == data.store_id).first()
         if not store:
@@ -1383,7 +1401,11 @@ class InventoryCheckService:
         self.db.flush()
 
         products = {p.id: p for p in self.db.query(Product).all()}
-        from_date = datetime.combine(data.check_date, datetime.min.time())
+
+        # 上次盘点日期（用于计算期间收货的起点）
+        last_check_date = self._get_last_check_date(data.store_id, data.check_date)
+        from_dt = datetime.combine(last_check_date, datetime.min.time()) if last_check_date else datetime.min
+        to_dt = datetime.combine(data.check_date, datetime.min.time())
 
         for item in data.items:
             # 保存盘点明细
@@ -1397,7 +1419,7 @@ class InventoryCheckService:
             # 计算销量
             beginning = self._get_last_check_quantity(data.store_id, item.product_id, data.check_date)
             received = self.stock_repo.get_store_receive_between(
-                data.store_id, item.product_id, from_date, from_date  # TODO: 需要上次盘点日期
+                data.store_id, item.product_id, from_dt, to_dt
             )
             ending = item.actual_quantity
             sales_qty = beginning + received - ending
@@ -1613,53 +1635,7 @@ git commit -m "feat: InventoryCheck — schema + service + api"
 
 ---
 
-### Task 18: 修复 InventoryCheckService 中的期间收货计算
-
-**Files:**
-- Modify: `backend/app/services/inventory_check_service.py`
-
-- [ ] **Step 1: 修正 from_date 为上次盘点日期**
-
-当前 Task 17 中 `get_store_receive_between` 的 from_date 用了 `data.check_date`，应改为上次盘点日期：
-
-```python
-# 在 create() 方法中，for item in data.items 循环内：
-last_check_date = self._get_last_check_date(data.store_id, data.check_date)
-from_dt = datetime.combine(last_check_date, datetime.min.time()) if last_check_date else datetime.min
-to_dt = datetime.combine(data.check_date, datetime.min.time())
-
-received = self.stock_repo.get_store_receive_between(
-    data.store_id, item.product_id, from_dt, to_dt
-)
-```
-
-加一个辅助方法：
-
-```python
-def _get_last_check_date(self, store_id: int, before_date: date) -> date | None:
-    last = (
-        self.db.query(InventoryCheck.check_date)
-        .filter(
-            InventoryCheck.store_id == store_id,
-            InventoryCheck.check_date < before_date,
-            InventoryCheck.status == "confirmed",
-        )
-        .order_by(InventoryCheck.check_date.desc())
-        .first()
-    )
-    return last[0] if last else None
-```
-
-- [ ] **Step 2: 提交**
-
-```bash
-git add backend/app/services/inventory_check_service.py
-git commit -m "fix: 盘点期间收货从上次盘点日期起算"
-```
-
----
-
-### Task 19: 前端类型 + API 适配
+### Task 18: 前端类型 + API 适配
 
 **Files:**
 - Modify: `frontend/src/types/index.ts`
@@ -1746,7 +1722,7 @@ git commit -m "feat: 前端 Store + InventoryCheck 类型和 API"
 
 ---
 
-### Task 20: 前端店铺管理页
+### Task 19: 前端店铺管理页
 
 **Files:**
 - Create: `frontend/src/pages/StoresPage.tsx`
@@ -1853,7 +1829,7 @@ git commit -m "feat: 店铺管理页"
 
 ---
 
-### Task 21: 前端盘点页
+### Task 20: 前端盘点页
 
 **Files:**
 - Create: `frontend/src/pages/InventoryCheckPage.tsx`
@@ -2014,7 +1990,7 @@ git commit -m "feat: 盘点页面"
 
 ---
 
-### Task 22: 更新库存流水和资金流水页加店铺筛选
+### Task 21: 更新库存流水和资金流水页加店铺筛选
 
 **Files:**
 - Modify: `frontend/src/pages/StockLedgerPage.tsx`
@@ -2037,7 +2013,7 @@ git commit -m "feat: 流水页加店铺筛选"
 
 ---
 
-### Task 23: 运行测试验证
+### Task 22: 运行测试验证
 
 **Files:**
 - 运行: 全部测试
