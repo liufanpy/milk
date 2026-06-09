@@ -144,9 +144,11 @@ ALTER TABLE transactions ADD COLUMN store_id INTEGER REFERENCES stores(id);
 ### 盘点撤销
 
 ```
-1. 删 StockMovement（source_type='inventory_check', source_id=该盘点单）
-2. 删 Transaction（source_type='inventory_check', source_id=该盘点单）
-3. 盘点单 status → cancelled
+1. 检查是否存在后续盘点（同一店铺、check_date > 当前盘点日期）
+   若存在 → 禁止撤销："已被后续盘点引用，请先撤销 IC-xxx"
+2. 删 StockMovement（source_type='inventory_check', source_id=该盘点单）
+3. 删 Transaction（source_type='inventory_check', source_id=该盘点单）
+4. 盘点单 status → cancelled
 ```
 
 ---
@@ -187,6 +189,8 @@ GET /api/transaction-ledger  加 store_id 筛选
 - **库存流水页**：加店铺筛选下拉
 - **资金流水页**：加店铺筛选下拉
 - **送货单创建**：选客户后自动关联店铺（无感）
+- **App.tsx**：注册 `/stores` 和 `/inventory-checks` 路由
+- **Layout.tsx**：侧边栏加"店铺管理"和"盘点管理"入口
 
 ---
 
