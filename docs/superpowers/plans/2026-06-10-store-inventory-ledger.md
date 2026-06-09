@@ -1098,12 +1098,24 @@ git commit -m "refactor: PurchaseService 适配 source 多态"
 source_type="retail", source_id=retail_order.id,
 ```
 
-- [ ] **Step 3: `create_sale()` 第 59–63 行 — cogs 交易**
+- [ ] **Step 3: `create_sale()` 第 53–63 行 — 删掉 cogs 交易创建**
+
+成本改为查询时从 StockMovement × 产品进价计算，不再冗余存储。**整块删掉**：
 
 ```python
-# 旧: retail_order_id=retail_order.id,
-# 新:
-source_type="retail", source_id=retail_order.id,
+# 删除以下代码：
+        # cogs 成本
+        product_ids = list({item.product_id for item in data.items})
+        costs = {p.id: p.default_purchase_price for p in self.db.query(Product).filter(Product.id.in_(product_ids)).all()}
+        for item in data.items:
+            cost = costs.get(item.product_id, 0)
+            if cost > 0:
+                self.txn_repo.create(
+                    customer_id=data.customer_id,
+                    category="cogs",
+                    amount=-(item.quantity * cost),
+                    retail_order_id=retail_order.id,
+                )
 ```
 
 - [ ] **Step 4: `create_sale()` 第 68–72 行 — payment 交易**
@@ -1540,12 +1552,22 @@ git commit -m "refactor: WastageService + wastage export 适配 source 多态"
 # 新: source_type="subscription", source_id=order_id,
 ```
 
-- [ ] **Step 5: `deduct()` 第 135–139 行 — cogs 交易**
+- [ ] **Step 5: `deduct()` 第 134–141 行 — 删掉 cogs 交易创建**
+
+**整块删掉**（付费行中的 cogs 创建）：
 
 ```python
-# 旧: subscription_order_id=order_id,
-# 新: source_type="subscription", source_id=order_id,
+# 删除以下代码：
+                if total_cost > 0:
+                    self.txn_repo.create(
+                        customer_id=order.customer_id,
+                        category="cogs",
+                        amount=-total_cost,
+                        subscription_order_id=order_id,
+                    )
 ```
+
+同时删掉 `_get_purchase_cost` 方法的调用（第 103 行 `purchase_cost = self._get_purchase_cost(item.product_id)`），该方法可保留以备他用。
 
 - [ ] **Step 6: 提交**
 
@@ -1918,16 +1940,6 @@ class InventoryCheckService:
                     "source_id": check.id,
                     "store_id": data.store_id,
                 }])
-
-                # 成本
-                cost = sales_qty * product.default_purchase_price
-                self.txn_repo.create(
-                    category="store_cogs",
-                    amount=-cost,
-                    source_type="inventory_check",
-                    source_id=check.id,
-                    store_id=data.store_id,
-                )
 
                 # 收入（需客户信息）
                 sale_price = self._resolve_sale_price(store.customer_id or 0, product)

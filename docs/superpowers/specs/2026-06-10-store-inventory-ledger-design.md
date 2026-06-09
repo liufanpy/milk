@@ -18,7 +18,14 @@
 ### 售价优先级
 
 - 客户协议价 > 产品 `default_wholesale_price`
-- 成本统一用产品 `default_purchase_price`
+
+### 成本与利润计算
+
+- 成本不在 Transaction 表中冗余记录
+- 利润 = 销售收入 - 出库成本
+  - 收入：`SUM(Transaction.amount WHERE category IN retail/subscription/store_sales)`
+  - 成本：`SUM(StockMovement.quantity × Product.default_purchase_price WHERE direction='out')`
+- 零售和订奶现有的 `cogs` Transaction 一并移除
 
 ---
 
@@ -137,8 +144,7 @@ ALTER TABLE transactions ADD COLUMN store_id INTEGER REFERENCES stores(id);
 
 | 情况 | 库存变动 | 资金流水 |
 |------|---------|---------|
-| 销量 > 0 | StockMovement: out, reason='store_sales' | store_cogs: -销量×进价 |
-| | | store_sales: +销量×售价 |
+| 销量 > 0 | StockMovement: out, reason='store_sales' | store_sales: +销量×售价 |
 | 销量 < 0 | StockMovement: in, reason='store_gain' | 无 |
 
 ### 盘点撤销
