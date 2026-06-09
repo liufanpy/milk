@@ -14,42 +14,28 @@ class StockMovementRepository:
         self.db.flush()
         return objs
 
-    def get_by_delivery(self, delivery_id: int) -> List[StockMovement]:
+    def get_by_source(self, source_type: str, source_id: int) -> List[StockMovement]:
         return self.db.query(StockMovement).filter(
-            StockMovement.delivery_id == delivery_id
+            StockMovement.source_type == source_type,
+            StockMovement.source_id == source_id,
         ).all()
 
-    def get_by_purchase_order(self, purchase_order_id: int) -> List[StockMovement]:
+    def get_by_source_reason(self, source_type: str, source_id: int, reason: str) -> List[StockMovement]:
         return self.db.query(StockMovement).filter(
-            StockMovement.purchase_order_id == purchase_order_id,
-            StockMovement.reason == "purchase",
+            StockMovement.source_type == source_type,
+            StockMovement.source_id == source_id,
+            StockMovement.reason == reason,
         ).all()
 
-    def get_by_retail_order(self, retail_order_id: int) -> List[StockMovement]:
+    def get_by_source_exclude_reason(self, source_type: str, source_id: int, exclude_reason: str) -> List[StockMovement]:
         return self.db.query(StockMovement).filter(
-            StockMovement.retail_order_id == retail_order_id,
-            StockMovement.reason == "retail",
-        ).all()
-
-    def get_by_subscription_order(self, subscription_order_id: int) -> List[StockMovement]:
-        return self.db.query(StockMovement).filter(
-            StockMovement.subscription_order_id == subscription_order_id
-        ).all()
-
-    def get_by_return_order(self, return_order_id: int) -> list:
-        return self.db.query(StockMovement).filter(
-            StockMovement.return_order_id == return_order_id,
-            StockMovement.reason != "cancel",
-        ).all()
-
-    def get_by_wastage_order(self, wastage_order_id: int) -> list:
-        return self.db.query(StockMovement).filter(
-            StockMovement.wastage_order_id == wastage_order_id,
-            StockMovement.reason != "cancel",
+            StockMovement.source_type == source_type,
+            StockMovement.source_id == source_id,
+            StockMovement.reason != exclude_reason,
         ).all()
 
     def get_inventory(self) -> list:
-        """按 product_id 汇总库存（不再按 shelf_id 分组）"""
+        """按 product_id 汇总总仓库存（store_id IS NULL）"""
         return (
             self.db.query(
                 StockMovement.product_id,
@@ -60,6 +46,7 @@ class StockMovementRepository:
                     )
                 ).label("stock"),
             )
+            .filter(StockMovement.store_id.is_(None))
             .group_by(StockMovement.product_id)
             .having(
                 func.sum(
@@ -72,13 +59,53 @@ class StockMovementRepository:
             .all()
         )
 
+    def get_inventory_by_store(self, store_id: int) -> list:
+        """按 product_id 汇总店铺库存"""
+        return (
+            self.db.query(
+                StockMovement.product_id,
+                func.sum(
+                    case(
+                        (StockMovement.direction == "in", StockMovement.quantity),
+                        (StockMovement.direction == "out", -StockMovement.quantity),
+                    )
+                ).label("stock"),
+            )
+            .filter(StockMovement.store_id == store_id)
+            .group_by(StockMovement.product_id)
+            .having(
+                func.sum(
+                    case(
+                        (StockMovement.direction == "in", StockMovement.quantity),
+                        (StockMovement.direction == "out", -StockMovement.quantity),
+                    )
+                ) != 0
+            )
+            .all()
+        )
+
+    def get_store_receive_between(self, store_id: int, product_id: int, from_date, to_date) -> int:
+        """两次盘点之间的店铺收货总量（按 delivery_date 算）"""
+        from app.models.delivery import Delivery
+        result = (
+            self.db.query(func.sum(StockMovement.quantity))
+            .join(Delivery, (StockMovement.source_type == "delivery") & (StockMovement.source_id == Delivery.id))
+            .filter(
+                StockMovement.store_id == store_id,
+                StockMovement.product_id == product_id,
+                StockMovement.reason == "store_receive",
+                Delivery.delivery_date >= from_date,
+                Delivery.delivery_date < to_date,
+            )
+            .scalar()
+        )
+        return result or 0
+
     def validate_stock(self, items: list):
-        """库存校验：按 product_id 汇总检查"""
         inventory = {
             r.product_id: r.stock
             for r in self.get_inventory()
         }
-        # 合并同产品多行
         needed: dict[int, int] = {}
         for item in items:
             pid = item.product_id if hasattr(item, 'product_id') else item["product_id"]

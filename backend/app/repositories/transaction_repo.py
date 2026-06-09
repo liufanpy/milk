@@ -14,9 +14,10 @@ class TransactionRepository:
         self.db.flush()
         return txn
 
-    def get_by_delivery(self, delivery_id: int) -> List[Transaction]:
+    def get_by_source(self, source_type: str, source_id: int) -> List[Transaction]:
         return self.db.query(Transaction).filter(
-            Transaction.delivery_id == delivery_id
+            Transaction.source_type == source_type,
+            Transaction.source_id == source_id,
         ).all()
 
     def get_ar_by_customer(self, customer_id: int) -> float:
@@ -55,20 +56,23 @@ class TransactionRepository:
             return {}
         rows = (
             self.db.query(
-                Transaction.delivery_id,
+                Transaction.source_id,
                 Transaction.category,
                 func.sum(Transaction.amount).label("total"),
             )
-            .filter(Transaction.delivery_id.in_(delivery_ids))
-            .group_by(Transaction.delivery_id, Transaction.category)
+            .filter(
+                Transaction.source_type == "delivery",
+                Transaction.source_id.in_(delivery_ids),
+            )
+            .group_by(Transaction.source_id, Transaction.category)
             .all()
         )
         result: dict[int, dict] = {did: {"total_amount": 0.0, "paid_amount": 0.0} for did in delivery_ids}
         for row in rows:
             if row.category in ("distribution", "delivery", "delivery_cancel"):
-                result[row.delivery_id]["total_amount"] += row.total
+                result[row.source_id]["total_amount"] += row.total
             elif row.category == "payment":
-                result[row.delivery_id]["paid_amount"] += row.total
+                result[row.source_id]["paid_amount"] += row.total
         for did, amounts in result.items():
             amounts["unpaid_amount"] = amounts["total_amount"] - amounts["paid_amount"]
         return result
