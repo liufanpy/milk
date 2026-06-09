@@ -2530,25 +2530,43 @@ git commit -m "feat: 注册店铺管理和盘点路由 + 侧边栏入口"
 
 ---
 
-### Task 22: 更新库存流水和资金流水页加店铺筛选
+### Task 22: 更新库存流水和资金流水页
 
 **Files:**
 - Modify: `frontend/src/pages/StockLedgerPage.tsx`
 - Modify: `frontend/src/pages/TransactionLedgerPage.tsx`
 
-- [ ] **Step 1: StockLedgerPage 加 store_id 筛选**
+- [ ] **Step 1: StockLedgerPage — 加店铺筛选 + 删 `cogs`**
 
-在 `StockLedgerPage.tsx` 筛选栏中加店铺下拉，查询参数加 `store_id`。
+筛选栏加店铺下拉，参数传 `store_id`。同时 `REASON_OPTIONS` 删掉 `'cogs'`（从未存在过的无效值）：
 
-- [ ] **Step 2: TransactionLedgerPage 加 store_id 筛选**
+```tsx
+// 旧:
+const REASON_OPTIONS = ['', 'purchase', 'retail', 'distribution', 'subscription', 'return', 'wastage', 'expired', 'damaged', 'self_consumed', 'cancel', 'exchange', 'promo', 'cogs'];
+// 新:
+const REASON_OPTIONS = ['', 'purchase', 'retail', 'distribution', 'subscription', 'return', 'wastage', 'expired', 'damaged', 'self_consumed', 'cancel', 'exchange', 'promo', 'store_receive', 'store_sales', 'store_gain'];
+```
 
-在 `TransactionLedgerPage.tsx` 筛选栏中加店铺下拉，查询参数加 `store_id`。
+新增 `store_receive`、`store_sales`、`store_gain` 三个 reason。
+
+- [ ] **Step 2: TransactionLedgerPage — 加店铺筛选 + 删 `cogs` + 加新类别**
+
+筛选栏加店铺下拉，`CAT_OPTIONS` 调整：
+
+```tsx
+// 旧:
+const CAT_OPTIONS = ['', 'retail', 'distribution', 'subscription', 'payment', 'refund', 'purchase', 'wastage', 'cogs', 'promo'];
+// 新:
+const CAT_OPTIONS = ['', 'retail', 'distribution', 'subscription', 'payment', 'refund', 'purchase', 'wastage', 'promo', 'store_sales'];
+```
+
+删 `cogs`，加 `store_sales`。
 
 - [ ] **Step 3: 提交**
 
 ```bash
 git add frontend/src/pages/StockLedgerPage.tsx frontend/src/pages/TransactionLedgerPage.tsx
-git commit -m "feat: 流水页加店铺筛选"
+git commit -m "fix: 流水页加店铺筛选，删 cogs 选项，加新类别"
 ```
 
 ---
