@@ -166,3 +166,36 @@ export interface RetailOrderDetailItem {
   quantity: number;
   unit_price: number;
 }
+
+export interface Store {
+  id: number;
+  name: string;
+  customer_id: number | null;
+  customer_name: string;
+  address: string;
+  status: string;
+  created_at: string;
+}
+
+export interface InventoryCheck {
+  id: number;
+  order_number: string;
+  store_id: number;
+  store_name: string;
+  check_date: string;
+  status: string;
+  item_count: number;
+  note: string;
+  created_at: string;
+}
+
+export interface InventoryCheckItem {
+  product_id: number;
+  product_name?: string;
+  actual_quantity: number;
+}
+
+export interface InventoryCheckDetail extends InventoryCheck {
+  items: any[];
+  transactions: any[];
+}

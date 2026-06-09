@@ -20,6 +20,8 @@ import InventoryPage from './pages/InventoryPage';
 import OperationLogsPage from './pages/OperationLogsPage';
 import StockLedgerPage from './pages/StockLedgerPage';
 import TransactionLedgerPage from './pages/TransactionLedgerPage';
+import StoresPage from './pages/StoresPage';
+import InventoryCheckPage from './pages/InventoryCheckPage';
 
 export default function App() {
   return (
@@ -40,6 +42,8 @@ export default function App() {
             <Route path="/subscriptions/:id" element={<SubscriptionDetailPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/logs" element={<OperationLogsPage />} />
+            <Route path="/stores" element={<StoresPage />} />
+            <Route path="/inventory-checks" element={<InventoryCheckPage />} />
             <Route path="/stock-ledger" element={<StockLedgerPage />} />
             <Route path="/transaction-ledger" element={<TransactionLedgerPage />} />
           </Route>

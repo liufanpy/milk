@@ -5,7 +5,7 @@ import { ledgerApi } from '../services/api';
 
 const DIR_OPTIONS = ['', 'in', 'out'];
 const DIR_LABELS: Record<string, string> = { '': '全部', in: '入库', out: '出库' };
-const REASON_OPTIONS = ['', 'purchase', 'retail', 'distribution', 'subscription', 'return', 'wastage', 'expired', 'damaged', 'self_consumed', 'cancel', 'exchange', 'promo', 'cogs'];
+const REASON_OPTIONS = ['', 'purchase', 'retail', 'distribution', 'subscription', 'return', 'wastage', 'expired', 'damaged', 'self_consumed', 'cancel', 'exchange', 'promo', 'store_receive', 'store_sales', 'store_gain'];
 
 export default function StockLedgerPage() {
   const [rows, setRows] = useState<any[]>([]);
@@ -14,16 +14,18 @@ export default function StockLedgerPage() {
   const [reason, setReason] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [storeId, setStoreId] = useState<number | string>('');
   const [orderNumber, setOrderNumber] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { load(); }, [productId, direction, reason, dateFrom, dateTo, orderNumber]);
+  useEffect(() => { load(); }, [productId, storeId, direction, reason, dateFrom, dateTo, orderNumber]);
 
   const load = async () => {
     setLoading(true);
     try {
       const params: any = {};
       if (productId) params.product_id = Number(productId);
+      if (storeId) params.store_id = Number(storeId);
       if (direction) params.direction = direction;
       if (reason) params.reason = reason;
       if (dateFrom) params.date_from = dateFrom;
@@ -53,6 +55,7 @@ export default function StockLedgerPage() {
     <div>
       <h2 className="text-xl font-bold mb-4">库存流水</h2>
       <div className="flex gap-3 mb-4 flex-wrap">
+        <input type="number" placeholder="店铺ID" value={storeId} onChange={(e) => setStoreId(e.target.value ? Number(e.target.value) : '')} className="border rounded px-3 py-2 text-sm w-24" />
         <div className="w-48">
           <ProductSelect value={productId} onChange={(v) => setProductId(v)} />
         </div>

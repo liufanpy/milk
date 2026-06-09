@@ -3,10 +3,11 @@ import { OrderListTable } from '../components/business/OrderListTable';
 import { CustomerSelect } from '../components/business/CustomerSelect';
 import { ledgerApi } from '../services/api';
 
-const CAT_OPTIONS = ['', 'retail', 'distribution', 'subscription', 'payment', 'refund', 'purchase', 'wastage', 'cogs', 'promo'];
+const CAT_OPTIONS = ['', 'retail', 'distribution', 'subscription', 'payment', 'refund', 'purchase', 'wastage', 'promo', 'store_sales'];
 
 export default function TransactionLedgerPage() {
   const [rows, setRows] = useState<any[]>([]);
+  const [storeId, setStoreId] = useState<number | string>('');
   const [customerId, setCustomerId] = useState<number | string>('');
   const [category, setCategory] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -14,12 +15,13 @@ export default function TransactionLedgerPage() {
   const [orderNumber, setOrderNumber] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { load(); }, [customerId, category, dateFrom, dateTo, orderNumber]);
+  useEffect(() => { load(); }, [customerId, storeId, category, dateFrom, dateTo, orderNumber]);
 
   const load = async () => {
     setLoading(true);
     try {
       const params: any = {};
+      if (storeId) params.store_id = Number(storeId);
       if (customerId) params.customer_id = Number(customerId);
       if (category) params.category = category;
       if (dateFrom) params.date_from = dateFrom;
@@ -49,6 +51,7 @@ export default function TransactionLedgerPage() {
     <div>
       <h2 className="text-xl font-bold mb-4">资金流水</h2>
       <div className="flex gap-3 mb-4">
+        <input type="number" placeholder="店铺ID" value={storeId} onChange={(e) => setStoreId(e.target.value ? Number(e.target.value) : '')} className="border rounded px-3 py-2 text-sm w-24" />
         <div className="w-48">
           <CustomerSelect value={customerId} onChange={(v) => setCustomerId(v)} />
         </div>

@@ -115,6 +115,22 @@ export const dashboardApi = {
   getOperationLogs: () => api.get('/operation-logs').then(r => r.data),
 };
 
+// Stores
+export const storeApi = {
+  list: () => api.get('/stores').then(r => r.data),
+  get: (id: number) => api.get(`/stores/${id}`).then(r => r.data),
+  create: (data: any) => api.post('/stores', data).then(r => r.data),
+  update: (id: number, data: any) => api.put(`/stores/${id}`, data).then(r => r.data),
+};
+
+// Inventory Checks
+export const inventoryCheckApi = {
+  create: (data: any) => api.post('/inventory-checks', data).then(r => r.data),
+  list: (params?: any) => api.get('/inventory-checks', { params }).then(r => r.data),
+  get: (id: number) => api.get(`/inventory-checks/${id}`).then(r => r.data),
+  cancel: (id: number) => api.post(`/inventory-checks/${id}/cancel`).then(r => r.data),
+};
+
 // Ledger queries
 export const ledgerApi = {
   stock: (params?: any) => api.get('/stock-ledger', { params }).then(r => r.data),
