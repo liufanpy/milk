@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.repositories.delivery_repo import DeliveryRepository
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
+from app.repositories.store_repo import StoreRepository
 from app.models.delivery import Delivery
 from app.schemas.delivery import DeliveryCreate, ExchangeCreate
 
@@ -13,6 +14,7 @@ class DeliveryService:
         self.delivery_repo = DeliveryRepository(db)
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
+        self.store_repo = StoreRepository(db)
 
     def _next_order_number(self) -> str:
         from app.services.order_number import next_order_number
@@ -44,11 +46,15 @@ class DeliveryService:
     def create_delivery(self, data: DeliveryCreate):
         self.stock_repo.validate_stock(data.items)
 
+        # 查客户关联的店铺
+        store = self.store_repo.get_by_customer(data.customer_id)
+
         delivery = self.delivery_repo.create(
             customer_id=data.customer_id,
             delivery_date=data.delivery_date,
             status="pending",
             subscription_order_id=data.subscription_order_id,
+            store_id=store.id if store else None,
             note=data.note,
         )
         delivery.order_number = self._next_order_number()
@@ -63,8 +69,24 @@ class DeliveryService:
                 "reason": "distribution",
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
-                "delivery_id": delivery.id,
+                "source_type": "delivery",
+                "source_id": delivery.id,
             })
+
+        # 若客户有店铺，多记一条店铺入库
+        if store:
+            for item in data.items:
+                movements.append({
+                    "product_id": item.product_id,
+                    "direction": "in",
+                    "reason": "store_receive",
+                    "quantity": item.quantity,
+                    "unit_price": item.unit_price,
+                    "source_type": "delivery",
+                    "source_id": delivery.id,
+                    "store_id": store.id,
+                    "customer_id": data.customer_id,
+                })
 
         self.stock_repo.bulk_create(movements)
 
@@ -73,7 +95,8 @@ class DeliveryService:
                 customer_id=data.customer_id,
                 category="distribution",
                 amount=total,
-                delivery_id=delivery.id,
+                source_type="delivery",
+                source_id=delivery.id,
             )
 
         delivery.status = "delivered"
@@ -86,8 +109,8 @@ class DeliveryService:
         delivery = self.delivery_repo.get_by_id(delivery_id)
         if not delivery:
             return None
-        movements = self.stock_repo.get_by_delivery(delivery_id)
-        transactions = self.txn_repo.get_by_delivery(delivery_id)
+        movements = self.stock_repo.get_by_source("delivery", delivery_id)
+        transactions = self.txn_repo.get_by_source("delivery", delivery_id)
         products = {p.id: p.name for p in self.db.query(Product).all()}
 
         delivery_total = sum(t.amount for t in transactions if t.category in ("distribution", "delivery"))
@@ -96,7 +119,6 @@ class DeliveryService:
 
         net = delivery_total + delivery_cancel_total
 
-        # 换货记录：按 created_at 分组
         exchange_movements = [m for m in movements if m.reason == "exchange"]
         groups: dict = {}
         for m in exchange_movements:
@@ -135,7 +157,10 @@ class DeliveryService:
             "total_amount": net,
             "paid_amount": paid_total,
             "unpaid_amount": net - paid_total,
-            "transactions": [{"id": t.id, "category": t.category, "amount": t.amount, "created_at": str(t.created_at)} for t in transactions],
+            "transactions": [
+                {"id": t.id, "category": t.category, "amount": t.amount, "created_at": str(t.created_at)}
+                for t in transactions
+            ],
             "exchanges": exchanges,
         }
 
@@ -151,34 +176,45 @@ class DeliveryService:
             raise ValueError("换货金额不一致，请走退货结算后重新开单")
 
         now = datetime.now()
+        store_id = delivery.store_id
 
-        # 退回入库（先 flush 让库存对后续校验可见）
         return_movements = []
         for item in data.return_items:
-            return_movements.append({
+            mov = {
                 "product_id": item.product_id,
                 "direction": "in",
                 "reason": "exchange",
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
-                "delivery_id": delivery_id,
+                "source_type": "delivery",
+                "source_id": delivery_id,
                 "created_at": now,
-            })
+            }
+            if store_id:
+                return_movements.append({**mov})  # 总仓
+                return_movements.append({**mov, "direction": "out", "store_id": store_id})  # 店铺
+            else:
+                return_movements.append(mov)
         self.stock_repo.bulk_create(return_movements)
 
-        # 新发出库（带库存校验，此时退回库存已可见）
         self.stock_repo.validate_stock(data.new_items)
         new_movements = []
         for item in data.new_items:
-            new_movements.append({
+            mov = {
                 "product_id": item.product_id,
                 "direction": "out",
                 "reason": "exchange",
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
-                "delivery_id": delivery_id,
+                "source_type": "delivery",
+                "source_id": delivery_id,
                 "created_at": now,
-            })
+            }
+            if store_id:
+                new_movements.append({**mov})  # 总仓
+                new_movements.append({**mov, "direction": "in", "store_id": store_id})  # 店铺
+            else:
+                new_movements.append(mov)
         self.stock_repo.bulk_create(new_movements)
 
         self.db.commit()

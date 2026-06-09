@@ -31,7 +31,8 @@ class SubscriptionService:
                 customer_id=data.customer_id,
                 category="payment",
                 amount=data.paid_amount,
-                subscription_order_id=order.id,
+                source_type="subscription",
+                source_id=order.id,
             )
         self.db.commit()
         return {
@@ -100,9 +101,7 @@ class SubscriptionService:
 
         for item in data.items:
             unit_price = 0.0 if item.is_promo else self._resolve_unit_price(order.customer_id, item.product_id, item.unit_price)
-            purchase_cost = self._get_purchase_cost(item.product_id)
             total_price = item.quantity * unit_price
-            total_cost = item.quantity * purchase_cost
 
             # StockMovement - 定奶出库
             self.stock_repo.bulk_create([{
@@ -111,33 +110,33 @@ class SubscriptionService:
                 "reason": "subscription",
                 "quantity": item.quantity,
                 "unit_price": unit_price,
-                "subscription_order_id": order_id,
+                "source_type": "subscription",
+                "source_id": order_id,
             }])
 
             if item.is_promo:
                 # 赠送行：记促销成本
+                total_cost = 0.0
+                if unit_price == 0:
+                    purchase_cost = self._get_purchase_cost(item.product_id)
+                    total_cost = item.quantity * purchase_cost
                 if total_cost > 0:
                     self.txn_repo.create(
                         customer_id=order.customer_id,
                         category="promo",
                         amount=-total_cost,
-                        subscription_order_id=order_id,
+                        source_type="subscription",
+                        source_id=order_id,
                     )
             else:
-                # 付费行：收入确认 + 成本
+                # 付费行：收入确认
                 self.txn_repo.create(
                     customer_id=order.customer_id,
                     category="subscription",
                     amount=total_price,
-                    subscription_order_id=order_id,
+                    source_type="subscription",
+                    source_id=order_id,
                 )
-                if total_cost > 0:
-                    self.txn_repo.create(
-                        customer_id=order.customer_id,
-                        category="cogs",
-                        amount=-total_cost,
-                        subscription_order_id=order_id,
-                    )
 
         # 更新余额
         order.remaining_amount -= paid_total

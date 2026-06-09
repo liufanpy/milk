@@ -94,7 +94,8 @@ class PurchaseService:
                 "reason": "purchase",
                 "quantity": qty,
                 "unit_price": cost,
-                "purchase_order_id": order_id,
+                "source_type": "purchase",
+                "source_id": order_id,
             })
 
         if movements:
@@ -106,7 +107,8 @@ class PurchaseService:
                 supplier_id=order.supplier_id,
                 category="purchase",
                 amount=total,
-                purchase_order_id=order_id,
+                source_type="purchase",
+                source_id=order_id,
             )
 
     # ── 撤销进货单 ────────────────────────────────
@@ -123,7 +125,7 @@ class PurchaseService:
 
         if order.status == "confirmed":
             # 反向冲抵库存
-            original_items = self.stock_repo.get_by_purchase_order(order_id)
+            original_items = self.stock_repo.get_by_source("purchase", order_id)
             # 校验：已出库的商品不能撤销
             inventory = {r.product_id: r.stock for r in self.stock_repo.get_inventory()}
             for item in original_items:
@@ -139,7 +141,8 @@ class PurchaseService:
                     "reason": "cancel",
                     "quantity": item.quantity,
                     "unit_price": item.unit_price,
-                    "purchase_order_id": order_id,
+                    "source_type": "purchase",
+                    "source_id": order_id,
                 })
                 reverse_total += item.quantity * item.unit_price
 
@@ -150,7 +153,8 @@ class PurchaseService:
                     supplier_id=order.supplier_id,
                     category="purchase",
                     amount=-reverse_total,
-                    purchase_order_id=order_id,
+                    source_type="purchase",
+                    source_id=order_id,
                 )
 
             order.status = "cancelled"
@@ -188,7 +192,7 @@ class PurchaseService:
         order = self.db.query(PurchaseOrder).filter(PurchaseOrder.id == order_id).first()
         if not order:
             return None
-        items = self.stock_repo.get_by_purchase_order(order_id)
+        items = self.stock_repo.get_by_source_reason("purchase", order_id, "purchase")
         products = {p.id: p.name for p in self.db.query(Product).all()}
         suppliers = {s.id: s.name for s in self.db.query(Supplier).all()}
 
@@ -316,14 +320,15 @@ class PurchaseService:
                     "product_id": pid,
                     "direction": "in", "reason": "purchase",
                     "quantity": qty, "unit_price": cost,
-                    "purchase_order_id": order.id,
+                    "source_type": "purchase",
+                    "source_id": order.id,
                     "created_at": datetime.now(),
                 })
 
             if movements:
                 self.stock_repo.bulk_create(movements)
                 if total > 0:
-                    self.txn_repo.create(supplier_id=sid, category="purchase", amount=total, purchase_order_id=order.id)
+                    self.txn_repo.create(supplier_id=sid, category="purchase", amount=total, source_type="purchase", source_id=order.id)
                 order.total_amount = total
                 success += len(movements)
 

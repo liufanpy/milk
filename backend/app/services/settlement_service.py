@@ -18,7 +18,8 @@ class SettlementService:
             customer_id=delivery.customer_id,
             category="payment",
             amount=amount,
-            delivery_id=delivery_id,
+            source_type="delivery",
+            source_id=delivery_id,
         )
 
         amounts = self.txn_repo.get_amounts_by_deliveries([delivery_id])
@@ -42,7 +43,8 @@ class SettlementService:
                 customer_id=customer_id,
                 category="payment",
                 amount=item["amount"],
-                delivery_id=item["delivery_id"],
+                source_type="delivery",
+                source_id=item["delivery_id"],
             )
             results.append({"delivery_id": item["delivery_id"], "paid": item["amount"]})
 

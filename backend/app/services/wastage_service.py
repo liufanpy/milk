@@ -40,7 +40,8 @@ class WastageService:
                 "reason": item.reason,
                 "quantity": item.quantity,
                 "unit_price": costs.get(item.product_id, 0),
-                "wastage_order_id": order.id,
+                "source_type": "wastage",
+                "source_id": order.id,
             })
             total_cost += item.quantity * costs.get(item.product_id, 0)
 
@@ -67,13 +68,16 @@ class WastageService:
         order_ids = [o.id for o in orders]
         movements = (
             self.db.query(StockMovement)
-            .filter(StockMovement.wastage_order_id.in_(order_ids))
+            .filter(
+                StockMovement.source_type == "wastage",
+                StockMovement.source_id.in_(order_ids),
+            )
             .all()
         )
 
         order_items: dict[int, list] = {}
         for m in movements:
-            order_items.setdefault(m.wastage_order_id, []).append(m)
+            order_items.setdefault(m.source_id, []).append(m)
 
         result = []
         for o in orders:
@@ -106,7 +110,7 @@ class WastageService:
         if not order:
             return None
 
-        items = self.stock_repo.get_by_wastage_order(order_id)
+        items = self.stock_repo.get_by_source("wastage", order_id)
         products = {p.id: p.name for p in self.db.query(Product).all()}
 
         def item_dict(m):
@@ -138,7 +142,7 @@ class WastageService:
         if order.status == "cancelled":
             raise ValueError("该损耗单已撤销")
 
-        original_items = self.stock_repo.get_by_wastage_order(order_id)
+        original_items = self.stock_repo.get_by_source("wastage", order_id)
         for m in original_items:
             self.stock_repo.bulk_create([{
                 "product_id": m.product_id,
@@ -146,7 +150,8 @@ class WastageService:
                 "reason": "cancel",
                 "quantity": m.quantity,
                 "unit_price": m.unit_price or 0,
-                "wastage_order_id": order_id,
+                "source_type": "wastage",
+                "source_id": order_id,
             }])
 
         self.wastage_repo.update_status(order_id, "cancelled")

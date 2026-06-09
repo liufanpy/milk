@@ -36,7 +36,8 @@ class SaleService:
                 "reason": "retail",
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
-                "retail_order_id": retail_order.id,
+                "source_type": "retail",
+                "source_id": retail_order.id,
             })
 
         self.stock_repo.bulk_create(movements)
@@ -47,21 +48,9 @@ class SaleService:
                 customer_id=data.customer_id,
                 category="retail",
                 amount=total,
-                retail_order_id=retail_order.id,
+                source_type="retail",
+                source_id=retail_order.id,
             )
-
-        # cogs 成本
-        product_ids = list({item.product_id for item in data.items})
-        costs = {p.id: p.default_purchase_price for p in self.db.query(Product).filter(Product.id.in_(product_ids)).all()}
-        for item in data.items:
-            cost = costs.get(item.product_id, 0)
-            if cost > 0:
-                self.txn_repo.create(
-                    customer_id=data.customer_id,
-                    category="cogs",
-                    amount=-(item.quantity * cost),
-                    retail_order_id=retail_order.id,
-                )
 
         # 已收款 → payment Transaction
         if data.paid and total > 0:
@@ -69,7 +58,8 @@ class SaleService:
                 customer_id=data.customer_id,
                 category="payment",
                 amount=total,
-                retail_order_id=retail_order.id,
+                source_type="retail",
+                source_id=retail_order.id,
             )
 
         self.db.commit()
@@ -89,16 +79,18 @@ class SaleService:
         movements = (
             self.db.query(StockMovement)
             .filter(
-                StockMovement.retail_order_id.in_(order_ids),
+                StockMovement.source_type == "retail",
+                StockMovement.source_id.in_(order_ids),
                 StockMovement.reason == "retail",
             )
             .all()
         )
 
         paid_ids = {
-            t.retail_order_id
+            t.source_id
             for t in self.db.query(Transaction).filter(
-                Transaction.retail_order_id.in_(order_ids),
+                Transaction.source_type == "retail",
+                Transaction.source_id.in_(order_ids),
                 Transaction.category == "payment",
             ).all()
         }
@@ -106,8 +98,8 @@ class SaleService:
         order_items: dict[int, list] = {}
         order_totals: dict[int, float] = {}
         for m in movements:
-            order_items.setdefault(m.retail_order_id, []).append(m)
-            order_totals[m.retail_order_id] = order_totals.get(m.retail_order_id, 0) + m.quantity * m.unit_price
+            order_items.setdefault(m.source_id, []).append(m)
+            order_totals[m.source_id] = order_totals.get(m.source_id, 0) + m.quantity * m.unit_price
 
         result = []
         for o in orders:
@@ -140,13 +132,14 @@ class SaleService:
         if not order:
             return None
 
-        items = self.stock_repo.get_by_retail_order(order_id)
+        items = self.stock_repo.get_by_source_reason("retail", order_id, "retail")
         products = {p.id: p.name for p in self.db.query(Product).all()}
         customers = {c.id: c.name for c in self.db.query(Customer).all()}
 
         paid = (
             self.db.query(Transaction).filter(
-                Transaction.retail_order_id == order_id,
+                Transaction.source_type == "retail",
+                Transaction.source_id == order_id,
                 Transaction.category == "payment",
             ).first()
             is not None
@@ -185,7 +178,8 @@ class SaleService:
         existing = (
             self.db.query(Transaction)
             .filter(
-                Transaction.retail_order_id == order_id,
+                Transaction.source_type == "retail",
+                Transaction.source_id == order_id,
                 Transaction.category == "payment",
             )
             .first()
@@ -197,7 +191,8 @@ class SaleService:
         income = (
             self.db.query(Transaction)
             .filter(
-                Transaction.retail_order_id == order_id,
+                Transaction.source_type == "retail",
+                Transaction.source_id == order_id,
                 Transaction.category == "retail",
             )
             .first()
@@ -209,7 +204,8 @@ class SaleService:
             customer_id=order.customer_id,
             category="payment",
             amount=income.amount,
-            retail_order_id=order_id,
+            source_type="retail",
+            source_id=order_id,
         )
         self.db.commit()
         return {"id": order.id, "paid": True}
@@ -222,7 +218,7 @@ class SaleService:
             raise ValueError("该销售已撤销")
 
         # 查原始出库记录
-        original_items = self.stock_repo.get_by_retail_order(order_id)
+        original_items = self.stock_repo.get_by_source_reason("retail", order_id, "retail")
         reverses = []
         for m in original_items:
             reverses.append({
@@ -231,7 +227,8 @@ class SaleService:
                 "reason": "cancel",
                 "quantity": m.quantity,
                 "unit_price": m.unit_price,
-                "retail_order_id": order_id,
+                "source_type": "retail",
+                "source_id": order_id,
             })
 
         if reverses:
@@ -240,7 +237,10 @@ class SaleService:
         # 反向冲抵账务
         original_txns = (
             self.db.query(Transaction)
-            .filter(Transaction.retail_order_id == order_id)
+            .filter(
+                Transaction.source_type == "retail",
+                Transaction.source_id == order_id,
+            )
             .all()
         )
         for t in original_txns:
@@ -248,7 +248,8 @@ class SaleService:
                 customer_id=order.customer_id,
                 category=t.category,
                 amount=-t.amount,
-                retail_order_id=order_id,
+                source_type="retail",
+                source_id=order_id,
             )
 
         self.retail_repo.update_status(order_id, "cancelled")

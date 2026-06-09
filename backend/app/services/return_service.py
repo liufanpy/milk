@@ -36,7 +36,8 @@ class ReturnService:
                 "reason": "return",
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
-                "return_order_id": order.id,
+                "source_type": "return",
+                "source_id": order.id,
             }])
             refund_total += item.quantity * item.unit_price
 
@@ -46,7 +47,8 @@ class ReturnService:
                 customer_id=data.customer_id,
                 category="refund",
                 amount=refund_total,
-                return_order_id=order.id,
+                source_type="return",
+                source_id=order.id,
             )
 
         self.db.commit()
@@ -66,22 +68,24 @@ class ReturnService:
         movements = (
             self.db.query(StockMovement)
             .filter(
-                StockMovement.return_order_id.in_(order_ids),
+                StockMovement.source_type == "return",
+                StockMovement.source_id.in_(order_ids),
                 StockMovement.reason == "return",
             )
             .all()
         )
         refunds = {
-            t.return_order_id: t.amount
+            t.source_id: t.amount
             for t in self.db.query(Transaction).filter(
-                Transaction.return_order_id.in_(order_ids),
+                Transaction.source_type == "return",
+                Transaction.source_id.in_(order_ids),
                 Transaction.category == "refund",
             ).all()
         }
 
         order_items: dict[int, list] = {}
         for m in movements:
-            order_items.setdefault(m.return_order_id, []).append(m)
+            order_items.setdefault(m.source_id, []).append(m)
 
         result = []
         for o in orders:
@@ -114,14 +118,15 @@ class ReturnService:
         if not order:
             return None
 
-        items = self.stock_repo.get_by_return_order(order_id)
+        items = self.stock_repo.get_by_source("return", order_id)
         products = {p.id: p.name for p in self.db.query(Product).all()}
         customers = {c.id: c.name for c in self.db.query(Customer).all()}
 
         refunds = (
             self.db.query(Transaction)
             .filter(
-                Transaction.return_order_id == order_id,
+                Transaction.source_type == "return",
+                Transaction.source_id == order_id,
                 Transaction.category == "refund",
             ).all()
         )
@@ -160,7 +165,7 @@ class ReturnService:
             raise ValueError("该退货单已撤销")
 
         # 查原始记录
-        original_items = self.stock_repo.get_by_return_order(order_id)
+        original_items = self.stock_repo.get_by_source("return", order_id)
         # 校验：已重新售出的退货不能撤销
         inventory = {r.product_id: r.stock for r in self.stock_repo.get_inventory()}
         for m in original_items:
@@ -177,13 +182,17 @@ class ReturnService:
                 "reason": "cancel",
                 "quantity": m.quantity,
                 "unit_price": m.unit_price or 0,
-                "return_order_id": order_id,
+                "source_type": "return",
+                "source_id": order_id,
             }])
 
         # 反向冲抵账务
         original_txns = (
             self.db.query(Transaction)
-            .filter(Transaction.return_order_id == order_id)
+            .filter(
+                Transaction.source_type == "return",
+                Transaction.source_id == order_id,
+            )
             .all()
         )
         for t in original_txns:
@@ -191,7 +200,8 @@ class ReturnService:
                 customer_id=order.customer_id,
                 category=t.category,
                 amount=-t.amount,
-                return_order_id=order_id,
+                source_type="return",
+                source_id=order_id,
             )
 
         self.return_repo.update_status(order_id, "cancelled")

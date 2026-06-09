@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.wastage_service import WastageService
 from app.schemas.wastage import WastageCreate
-from app.models.wastage_order import WastageOrder
 from app.models.stock_movement import StockMovement
 from app.models.product import Product
 
@@ -32,8 +31,8 @@ def list_wastage(svc: WastageService = Depends(get_wastage_service)):
 # /export MUST be before /{order_id} or "export" gets parsed as an order_id
 @router.get("/export")
 def export_wastage(db: Session = Depends(get_db)):
-    rows = db.query(StockMovement).join(WastageOrder).filter(
-        StockMovement.wastage_order_id.isnot(None)
+    rows = db.query(StockMovement).filter(
+        StockMovement.source_type == "wastage"
     ).order_by(StockMovement.created_at.desc()).all()
     products = {p.id: p.name for p in db.query(Product).all()}
     csv_lines = ["产品名称,数量,原因,时间"]
