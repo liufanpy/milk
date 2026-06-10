@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.repositories.wastage_order_repo import WastageOrderRepository
-from app.schemas.wastage import WastageCreate, VALID_REASONS
+from app.schemas.wastage import WastageCreate
 from app.models.wastage_order import WastageOrder
 from app.models.product import Product
 
@@ -19,10 +19,6 @@ class WastageService:
         return next_order_number(self.db, WastageOrder, "WO")
 
     def create_wastage(self, data: WastageCreate):
-        for item in data.items:
-            if item.reason not in VALID_REASONS:
-                raise ValueError(f"无效的损耗原因: {item.reason}")
-
         self.stock_repo.validate_stock(data.items)
 
         order = self.wastage_repo.create(note=data.note)
@@ -37,7 +33,7 @@ class WastageService:
             movements.append({
                 "product_id": item.product_id,
                 "direction": "out",
-                "reason": item.reason,
+                "reason": "wastage",
                 "quantity": item.quantity,
                 "unit_price": costs.get(item.product_id, 0),
                 "source_type": "wastage",

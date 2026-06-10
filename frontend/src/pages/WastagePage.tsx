@@ -8,15 +8,10 @@ import { OrderDetailModal } from '../components/business/OrderDetailModal';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { wastageApi } from '../services/api';
 
-const REASON_LABELS: Record<string, string> = {
-  expired: '过期', damaged: '破损', self_consumed: '自喝',
-};
-
 interface WastageItem {
   product_id: number;
   quantity: number;
   unit_price: number;
-  reason: string;
 }
 
 const wastageStatusConfig = {
@@ -27,7 +22,7 @@ const wastageStatusConfig = {
 export default function WastagePage() {
   const [formOpen, setFormOpen] = useState(false);
   const [items, setItems] = useState<WastageItem[]>([
-    { product_id: 0, quantity: 1, unit_price: 0, reason: 'expired' },
+    { product_id: 0, quantity: 1, unit_price: 0 },
   ]);
   const [note, setNote] = useState('');
 
@@ -51,7 +46,7 @@ export default function WastagePage() {
       await wastageApi.create({ items, note });
       alert('损耗记录成功');
       setFormOpen(false);
-      setItems([{ product_id: 0, quantity: 1, unit_price: 0, reason: 'expired' }]);
+      setItems([{ product_id: 0, quantity: 1, unit_price: 0 }]);
       setNote('');
       loadRecords();
     } catch (err: any) {
@@ -80,7 +75,7 @@ export default function WastagePage() {
   const columns = [
     { key: 'order_number', title: '单号', render: (r: any) => r.order_number || `#${r.id}` },
     { key: 'items_summary', title: '品项' },
-    { key: 'reasons', title: '原因', render: (r: any) => r.reasons?.map((s: string) => REASON_LABELS[s] || s).join('、') },
+    { key: 'reasons', title: '原因', render: () => '损耗' },
     {
       key: 'status', title: '状态',
       render: (r: any) => <StatusBadge status={r.status} config={wastageStatusConfig} />,
@@ -118,23 +113,10 @@ export default function WastagePage() {
             onUpdate={(idx, field, value) => updateItem(idx, field as keyof WastageItem, value)}
             onProductChange={(idx, pid) => updateItem(idx, 'product_id', pid)}
             onRemove={(idx) => setItems(items.filter((_, i) => i !== idx))}
-            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0, reason: 'expired' }])}
+            onAdd={() => setItems([...items, { product_id: 0, quantity: 1, unit_price: 0 }])}
             onlyInStock
           >
-            {(item, idx) => (
-              <div className="w-28">
-                <label className="text-xs text-gray-500">原因</label>
-                <select
-                  value={item.reason}
-                  onChange={(e) => updateItem(idx, 'reason', e.target.value)}
-                  className="w-full border rounded px-2 py-1 text-sm"
-                >
-                  {Object.entries(REASON_LABELS).map(([val, label]) => (
-                    <option key={val} value={val}>{label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {() => null}
           </ItemRowEditor>
           <Input placeholder="备注" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>

@@ -15,7 +15,7 @@ class TestWastageCreate:
         })
 
         resp = client.post("/api/wastage", json={
-            "items": [{"product_id": p.id, "quantity": 3, "reason": "expired"}],
+            "items": [{"product_id": p.id, "quantity": 3}],
         })
 
         assert resp.status_code == 201
@@ -27,8 +27,8 @@ class TestWastageCreate:
         assert stock is not None
         assert stock["stock"] == 7
 
-    def test_create_wastage_invalid_reason_fails(self, client, seed_data):
-        """无效的 reason 被拒绝"""
+    def test_create_wastage_invalid_reason_ignored(self, client, seed_data):
+        """reason 字段已废弃，额外字段被 Pydantic 忽略"""
         s = seed_data["suppliers"][0]
         p = seed_data["products"][0]
         client.post("/api/purchases", json={
@@ -39,15 +39,15 @@ class TestWastageCreate:
         })
 
         resp = client.post("/api/wastage", json={
-            "items": [{"product_id": p.id, "quantity": 1, "reason": "giveaway"}],
+            "items": [{"product_id": p.id, "quantity": 1}],
         })
-        assert resp.status_code == 400
+        assert resp.status_code == 201
 
     def test_create_wastage_insufficient_stock_fails(self, client, seed_data):
         """库存不足时拒绝"""
         p = seed_data["products"][0]
         resp = client.post("/api/wastage", json={
-            "items": [{"product_id": p.id, "quantity": 100, "reason": "damaged"}],
+            "items": [{"product_id": p.id, "quantity": 100}],
         })
         assert resp.status_code == 400
 
@@ -64,7 +64,7 @@ class TestWastageListAndDetail:
             "status": "confirmed",
         })
         client.post("/api/wastage", json={
-            "items": [{"product_id": p.id, "quantity": 2, "reason": "expired"}],
+            "items": [{"product_id": p.id, "quantity": 2}],
         })
 
         resp = client.get("/api/wastage")
@@ -77,7 +77,7 @@ class TestWastageListAndDetail:
         assert "status" in data[0]
 
     def test_detail_includes_reason(self, client, seed_data):
-        """损耗详情包含品项 reason"""
+        """损耗详情统一使用 wastage"""
         s = seed_data["suppliers"][0]
         p = seed_data["products"][0]
         client.post("/api/purchases", json={
@@ -87,12 +87,12 @@ class TestWastageListAndDetail:
             "status": "confirmed",
         })
         resp = client.post("/api/wastage", json={
-            "items": [{"product_id": p.id, "quantity": 2, "reason": "self_consumed"}],
+            "items": [{"product_id": p.id, "quantity": 2}],
         })
         order_id = resp.json()["id"]
 
         detail = client.get(f"/api/wastage/{order_id}").json()
-        assert detail["items"][0]["reason"] == "self_consumed"
+        assert detail["items"][0]["reason"] == "wastage"
 
 
 class TestWastageCancel:
@@ -107,7 +107,7 @@ class TestWastageCancel:
             "status": "confirmed",
         })
         resp = client.post("/api/wastage", json={
-            "items": [{"product_id": p.id, "quantity": 2, "reason": "expired"}],
+            "items": [{"product_id": p.id, "quantity": 2}],
         })
         order_id = resp.json()["id"]
 
