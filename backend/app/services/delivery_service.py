@@ -79,7 +79,7 @@ class DeliveryService:
                 movements.append({
                     "product_id": item.product_id,
                     "direction": "in",
-                    "reason": "store_receive",
+                    "reason": "distribution",
                     "quantity": item.quantity,
                     "unit_price": item.unit_price,
                     "source_type": "delivery",

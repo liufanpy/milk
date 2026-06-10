@@ -5,7 +5,7 @@ import { ledgerApi } from '../services/api';
 
 const DIR_OPTIONS = ['', 'in', 'out'];
 const DIR_LABELS: Record<string, string> = { '': '全部', in: '入库', out: '出库' };
-const REASON_OPTIONS = ['', 'purchase', 'retail', 'distribution', 'subscription', 'return', 'wastage', 'expired', 'damaged', 'self_consumed', 'cancel', 'exchange', 'promo', 'store_receive', 'store_sales', 'store_gain'];
+const REASON_OPTIONS = ['', 'purchase', 'retail', 'distribution', 'subscription', 'return', 'wastage', 'expired', 'damaged', 'self_consumed', 'cancel', 'exchange', 'promo', 'inventory_check'];
 
 export default function StockLedgerPage() {
   const [rows, setRows] = useState<any[]>([]);

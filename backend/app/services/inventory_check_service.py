@@ -107,7 +107,7 @@ class InventoryCheckService:
                 self.stock_repo.bulk_create([{
                     "product_id": item.product_id,
                     "direction": "out",
-                    "reason": "store_sales",
+                    "reason": "inventory_check",
                     "quantity": sales_qty,
                     "source_type": "inventory_check",
                     "source_id": check.id,
@@ -119,7 +119,7 @@ class InventoryCheckService:
                 revenue = sales_qty * sale_price
                 self.txn_repo.create(
                     customer_id=store.customer_id,
-                    category="store_sales",
+                    category="inventory_check",
                     amount=revenue,
                     source_type="inventory_check",
                     source_id=check.id,
@@ -131,7 +131,7 @@ class InventoryCheckService:
                 self.stock_repo.bulk_create([{
                     "product_id": item.product_id,
                     "direction": "in",
-                    "reason": "store_gain",
+                    "reason": "inventory_check",
                     "quantity": -sales_qty,
                     "source_type": "inventory_check",
                     "source_id": check.id,
@@ -182,14 +182,14 @@ class InventoryCheckService:
         item_details = []
         for item in items:
             p = products.get(item.product_id)
-            sales_move = next((m for m in stock_moves if m.product_id == item.product_id and m.reason == "store_sales"), None)
-            gain_move = next((m for m in stock_moves if m.product_id == item.product_id and m.reason == "store_gain"), None)
-            sales_qty = sales_move.quantity if sales_move else (gain_move.quantity if gain_move else 0)
+            out_move = next((m for m in stock_moves if m.product_id == item.product_id and m.direction == "out"), None)
+            in_move = next((m for m in stock_moves if m.product_id == item.product_id and m.direction == "in"), None)
+            sales_qty = out_move.quantity if out_move else (in_move.quantity if in_move else 0)
             item_details.append({
                 "product_id": item.product_id,
                 "product_name": p.name if p else "",
                 "actual_quantity": item.actual_quantity,
-                "sales_quantity": sales_qty if sales_move else (-gain_move.quantity if gain_move else 0),
+                "sales_quantity": sales_qty if out_move else (-in_move.quantity if in_move else 0),
                 "unit_price": p.default_wholesale_price if p else 0,
             })
 

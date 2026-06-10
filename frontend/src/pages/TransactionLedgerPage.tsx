@@ -3,7 +3,7 @@ import { OrderListTable } from '../components/business/OrderListTable';
 import { CustomerSelect } from '../components/business/CustomerSelect';
 import { ledgerApi } from '../services/api';
 
-const CAT_OPTIONS = ['', 'retail', 'distribution', 'subscription', 'payment', 'refund', 'purchase', 'wastage', 'promo', 'store_sales'];
+const CAT_OPTIONS = ['', 'retail', 'distribution', 'subscription', 'payment', 'refund', 'purchase', 'wastage', 'promo', 'inventory_check'];
 
 export default function TransactionLedgerPage() {
   const [rows, setRows] = useState<any[]>([]);

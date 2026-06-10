@@ -93,7 +93,8 @@ class StockMovementRepository:
             .filter(
                 StockMovement.store_id == store_id,
                 StockMovement.product_id == product_id,
-                StockMovement.reason == "store_receive",
+                StockMovement.reason == "distribution",
+                StockMovement.direction == "in",
                 Delivery.delivery_date >= from_date,
                 Delivery.delivery_date < to_date,
             )
