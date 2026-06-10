@@ -6,6 +6,7 @@ import { OrderListTable } from '../components/business/OrderListTable';
 import { OrderFormModal } from '../components/business/OrderFormModal';
 import { OrderDetailModal } from '../components/business/OrderDetailModal';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import CsvImportModal from '../components/business/CsvImportModal';
 import { wastageApi } from '../services/api';
 
 interface WastageItem {
@@ -30,6 +31,7 @@ export default function WastagePage() {
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<any>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadRecords = useCallback(() => wastageApi.list().then(setRecords), []);
 
@@ -88,6 +90,7 @@ export default function WastagePage() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">损耗管理</h2>
         <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>导入 CSV</Button>
           <Button variant="secondary" size="sm" onClick={() => window.open('/api/wastage/export')}>导出 CSV</Button>
           <Button onClick={() => setFormOpen(true)}>+ 新建损耗</Button>
         </div>
@@ -141,6 +144,15 @@ export default function WastagePage() {
           <Button size="sm" variant="danger" onClick={handleCancel}>撤销</Button>
         )}
       </OrderDetailModal>
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入损耗"
+        onImport={(file) => wastageApi.importFile(file)}
+        onConfirm={(rows) => wastageApi.confirmImport(rows)}
+        onDone={() => loadRecords()}
+      />
     </div>
   );
 }

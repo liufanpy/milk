@@ -7,6 +7,7 @@ import { OrderListTable } from '../components/business/OrderListTable';
 import { OrderFormModal } from '../components/business/OrderFormModal';
 import { OrderDetailModal } from '../components/business/OrderDetailModal';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import CsvImportModal from '../components/business/CsvImportModal';
 import { returnApi, customerApi } from '../services/api';
 
 interface ReturnItem {
@@ -39,15 +40,12 @@ export default function ReturnsPage() {
   // 详情
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<any>(null);
-  const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadReturns = useCallback(() => returnApi.list().then(setReturns), []);
 
   useEffect(() => {
     loadReturns();
-    customerApi.list().then((data: any) =>
-      setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name])))
-    );
   }, [loadReturns]);
 
   const updateItem = (idx: number, field: keyof ReturnItem, value: number | boolean) =>
@@ -110,7 +108,11 @@ export default function ReturnsPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">退货管理</h2>
-        <Button onClick={() => setFormOpen(true)}>+ 新建退货</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button variant="secondary" size="sm" onClick={() => window.open('/api/returns/export')}>导出 CSV</Button>
+          <Button onClick={() => setFormOpen(true)}>+ 新建退货</Button>
+        </div>
       </div>
 
       <OrderListTable
@@ -166,6 +168,15 @@ export default function ReturnsPage() {
           <Button size="sm" variant="danger" onClick={handleCancel}>撤销</Button>
         )}
       </OrderDetailModal>
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入退货"
+        onImport={(file) => returnApi.importFile(file)}
+        onConfirm={(rows) => returnApi.confirmImport(rows)}
+        onDone={() => loadReturns()}
+      />
     </div>
   );
 }

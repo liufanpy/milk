@@ -3,6 +3,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { OrderListTable } from '../components/business/OrderListTable';
 import { OrderDetailModal } from '../components/business/OrderDetailModal';
+import CsvImportModal from '../components/business/CsvImportModal';
 import { storeApi, productApi, storeSalesApi } from '../services/api';
 import type { StoreSalesOrder, StoreSalesDetail } from '../types';
 
@@ -16,6 +17,7 @@ export default function StoreSalesPage() {
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState<StoreSalesDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     storeApi.list().then((data: any) => {
@@ -77,7 +79,13 @@ export default function StoreSalesPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">巡店管理</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">巡店管理</h2>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>导入 CSV</Button>
+          <Button variant="secondary" size="sm" onClick={() => window.open('/api/store-sales/export')}>导出 CSV</Button>
+        </div>
+      </div>
 
       <div className="bg-white rounded-lg border p-4 mb-6">
         <h3 className="font-semibold mb-3">新建巡店</h3>
@@ -135,6 +143,15 @@ export default function StoreSalesPage() {
           </>
         }
         items={detail?.items || []}
+      />
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入巡店"
+        onImport={(file) => storeSalesApi.importFile(file)}
+        onConfirm={(rows) => storeSalesApi.confirmImport(rows)}
+        onDone={() => loadChecks()}
       />
     </div>
   );

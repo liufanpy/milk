@@ -9,6 +9,7 @@ import { OrderListTable } from '../components/business/OrderListTable';
 import { OrderFormModal } from '../components/business/OrderFormModal';
 import { OrderDetailModal } from '../components/business/OrderDetailModal';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import CsvImportModal from '../components/business/CsvImportModal';
 import { useDistributions, useCreateDistribution, useSettleDistribution, useExchangeDistribution } from '../hooks/useDistribution';
 import { distributionApi, customerApi, productApi } from '../services/api';
 
@@ -46,6 +47,7 @@ export default function DistributionPage() {
   const [settleAmount, setSettleAmount] = useState(0);
   const [settleOpen, setSettleOpen] = useState(false);
   const [exchangeOpen, setExchangeOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [returnItems, setReturnItems] = useState<DistributionCreateItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
   const [newItems, setNewItems] = useState<DistributionCreateItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
 
@@ -184,6 +186,7 @@ export default function DistributionPage() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">铺货单管理</h2>
         <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>导入 CSV</Button>
           <Button variant="secondary" size="sm" onClick={() => window.open('/api/distribution-orders/export')}>导出 CSV</Button>
           <Button onClick={() => setFormOpen(true)}>+ 新建铺货</Button>
         </div>
@@ -340,6 +343,15 @@ export default function DistributionPage() {
           <Button onClick={handleExchange} disabled={exchangeMutation.isPending}>确认换货</Button>
         </div>
       </Modal>
+
+      <CsvImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="导入铺货"
+        onImport={(file) => distributionApi.importFile(file)}
+        onConfirm={(rows) => distributionApi.confirmImport(rows)}
+        onDone={() => refetch()}
+      />
     </div>
   );
 }
