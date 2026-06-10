@@ -3,44 +3,18 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.transaction import Transaction
+from app.models.document import Document
 from app.models.customer import Customer
-from app.models.supplier import Supplier
-from app.models.purchase_order import PurchaseOrder
-from app.models.retail_order import RetailOrder
-from app.models.return_order import ReturnOrder
-from app.models.delivery import Delivery
-from app.models.subscription_order import SubscriptionOrder
-from app.models.inventory_check import InventoryCheck
 
 router = APIRouter(prefix="/api/transaction-ledger", tags=["transaction-ledger"])
 
-_SOURCE_MODELS = {
-    "purchase": PurchaseOrder,
-    "retail": RetailOrder,
-    "return": ReturnOrder,
-    "delivery": Delivery,
-    "subscription": SubscriptionOrder,
-    "inventory_check": InventoryCheck,
-}
-
 
 def _order_number_map(db: Session, txns: list) -> dict:
-    ids_by_type: dict[str, set] = {}
-    for t in txns:
-        if t.source_type and t.source_id:
-            ids_by_type.setdefault(t.source_type, set()).add(t.source_id)
-
-    result: dict[int, str] = {}
-    for stype, ids in ids_by_type.items():
-        model = _SOURCE_MODELS.get(stype)
-        if not model:
-            continue
-        for row in db.query(model).filter(model.id.in_(ids)).all():
-            for t in txns:
-                if t.source_type == stype and t.source_id == row.id:
-                    if row.order_number:
-                        result[t.id] = row.order_number
-    return result
+    source_ids = {t.source_id for t in txns if t.source_id}
+    if not source_ids:
+        return {}
+    docs = {d.id: d.order_number for d in db.query(Document).filter(Document.id.in_(source_ids)).all()}
+    return {t.id: docs.get(t.source_id, "") for t in txns if t.source_id}
 
 
 @router.get("")
@@ -66,17 +40,9 @@ def list_transaction_ledger(
     if date_to:
         q = q.filter(Transaction.created_at < date.fromisoformat(date_to))
     if order_number:
-        filters = []
-        for stype, model in _SOURCE_MODELS.items():
-            matched = db.query(model.id).filter(model.order_number == order_number).all()
-            if matched:
-                ids = [row[0] for row in matched]
-                filters.append(
-                    (Transaction.source_type == stype) & (Transaction.source_id.in_(ids))
-                )
-        if filters:
-            from sqlalchemy import or_
-            q = q.filter(or_(*filters))
+        matched_ids = [d.id for d in db.query(Document.id).filter(Document.order_number == order_number).all()]
+        if matched_ids:
+            q = q.filter(Transaction.source_id.in_(matched_ids))
         else:
             q = q.filter(Transaction.id == -1)
 
@@ -85,7 +51,6 @@ def list_transaction_ledger(
         return []
 
     customers = {c.id: c.name for c in db.query(Customer).all()}
-    suppliers = {s.id: s.name for s in db.query(Supplier).all()}
     order_numbers = _order_number_map(db, txns)
 
     balances: dict[int, float] = {}
@@ -95,21 +60,19 @@ def list_transaction_ledger(
         if t.customer_id:
             name = customers.get(t.customer_id, "")
             balances.setdefault(t.customer_id, 0.0)
-            if t.category in ("distribution", "retail", "subscription"):
+            cat_val = t.category.value if hasattr(t.category, 'value') else t.category
+            if cat_val in ("distribution", "retail", "subscription"):
                 balances[t.customer_id] += t.amount
-            elif t.category in ("payment", "refund"):
+            elif cat_val in ("payment", "refund"):
                 balances[t.customer_id] -= t.amount
             bal = balances[t.customer_id]
-        elif t.supplier_id:
-            name = suppliers.get(t.supplier_id, "")
-            bal = None
         else:
             bal = None
 
         rows.append({
             "id": t.id,
             "customer_name": name,
-            "category": t.category,
+            "category": t.category.value if hasattr(t.category, 'value') else t.category,
             "amount": t.amount,
             "balance": round(bal, 2) if bal is not None else None,
             "order_number": order_numbers.get(t.id, ""),

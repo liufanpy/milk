@@ -13,13 +13,13 @@ class ReturnOrderRepository:
         self.db.flush()
         return order
 
-    def get_by_id(self, id: int) -> Optional[ReturnOrder]:
-        return self.db.query(ReturnOrder).filter(ReturnOrder.id == id).first()
+    def get_by_id(self, document_id: int) -> Optional[ReturnOrder]:
+        return self.db.query(ReturnOrder).filter(ReturnOrder.document_id == document_id).first()
 
     def list_all(self):
         return self.db.query(ReturnOrder).order_by(ReturnOrder.created_at.desc()).all()
 
-    def update_status(self, order_id: int, status: str):
-        order = self.get_by_id(order_id)
+    def update_status(self, document_id: int, status: str):
+        order = self.get_by_id(document_id)
         if order:
             order.status = status

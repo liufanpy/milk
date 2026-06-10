@@ -1,12 +1,8 @@
-import io
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.wastage_service import WastageService
 from app.schemas.wastage import WastageCreate
-from app.models.stock_movement import StockMovement
-from app.models.product import Product
 
 router = APIRouter(prefix="/api/wastage", tags=["wastage"])
 
@@ -28,23 +24,20 @@ def list_wastage(svc: WastageService = Depends(get_wastage_service)):
     return svc.list_wastage()
 
 
-# /export MUST be before /{order_id} or "export" gets parsed as an order_id
 @router.get("/export")
-def export_wastage(db: Session = Depends(get_db)):
-    rows = db.query(StockMovement).filter(
-        StockMovement.source_type == "wastage"
-    ).order_by(StockMovement.created_at.desc()).all()
-    products = {p.id: p.name for p in db.query(Product).all()}
-    csv_lines = ["产品名称,数量,原因,时间"]
-    for r in rows:
-        pname = products.get(r.product_id, str(r.product_id))
-        csv_lines.append(f"{pname},{r.quantity},{r.reason},{r.created_at}")
-    csv_content = "\n".join(csv_lines)
-    return StreamingResponse(
-        io.BytesIO(csv_content.encode("utf-8-sig")),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=wastage.csv"},
-    )
+def export_wastage(svc: WastageService = Depends(get_wastage_service)):
+    return svc.export_csv()
+
+
+@router.post("/import")
+async def import_wastage(file: UploadFile = File(...), svc: WastageService = Depends(get_wastage_service)):
+    content = await file.read()
+    return svc.import_preview(content)
+
+
+@router.post("/import/confirm")
+def confirm_import(data: dict, svc: WastageService = Depends(get_wastage_service)):
+    return svc.import_confirm(data.get("rows", []))
 
 
 @router.get("/{order_id}")

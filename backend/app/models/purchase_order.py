@@ -1,18 +1,16 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text
+from datetime import date, datetime
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey
 from app.database import Base
 
 
 class PurchaseOrder(Base):
     __tablename__ = "purchase_orders"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    order_number = Column(String(20), nullable=False, unique=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), primary_key=True)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
-    purchase_date = Column(Date, nullable=False)
-    total_amount = Column(Float, nullable=False, default=0.0)
+    purchase_date = Column(Date, default=date.today)
+    total_amount = Column(Float, default=0.0)
+    status = Column(String(20), default="draft")
     note = Column(String(500), default="")
-    status = Column(String(20), nullable=False, default="draft")
-    _items_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

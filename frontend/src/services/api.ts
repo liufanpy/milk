@@ -66,15 +66,20 @@ export const saleApi = {
   get: (id: number) => api.get(`/sales/${id}`).then(r => r.data),
   pay: (id: number) => api.post(`/sales/${id}/pay`).then(r => r.data),
   cancel: (id: number) => api.post(`/sales/${id}/cancel`).then(r => r.data),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/sales/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/sales/import/confirm', { rows }).then(r => r.data),
 };
 
-// Deliveries
-export const deliveryApi = {
-  create: (data: any) => api.post('/deliveries', data).then(r => r.data),
-  list: (params?: any) => api.get('/deliveries', { params }).then(r => r.data),
-  get: (id: number) => api.get(`/deliveries/${id}`).then(r => r.data),
-  exchange: (id: number, data: any) => api.post(`/deliveries/${id}/exchange`, data).then(r => r.data),
-  settle: (id: number, amount: number) => api.post(`/deliveries/${id}/settle`, { amount }).then(r => r.data),
+// Distribution Orders (铺货管理)
+export const distributionApi = {
+  create: (data: any) => api.post('/distribution-orders', data).then(r => r.data),
+  list: (params?: any) => api.get('/distribution-orders', { params }).then(r => r.data),
+  get: (id: number) => api.get(`/distribution-orders/${id}`).then(r => r.data),
+  exchange: (id: number, data: any) => api.post(`/distribution-orders/${id}/exchange`, data).then(r => r.data),
+  settle: (id: number, amount: number) => api.post(`/distribution-orders/${id}/settle`, { amount }).then(r => r.data),
+  batchSettle: (customerId: number, items: any[]) => api.post('/distribution-orders/batch-settle', { customer_id: customerId, items }).then(r => r.data),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/distribution-orders/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/distribution-orders/import/confirm', { rows }).then(r => r.data),
 };
 
 // Returns
@@ -83,6 +88,8 @@ export const returnApi = {
   list: () => api.get('/returns').then(r => r.data),
   get: (id: number) => api.get(`/returns/${id}`).then(r => r.data),
   cancel: (id: number) => api.post(`/returns/${id}/cancel`).then(r => r.data),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/returns/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/returns/import/confirm', { rows }).then(r => r.data),
 };
 
 // Wastage
@@ -91,7 +98,8 @@ export const wastageApi = {
   list: () => api.get('/wastage').then(r => r.data),
   get: (id: number) => api.get(`/wastage/${id}`).then(r => r.data),
   cancel: (id: number) => api.post(`/wastage/${id}/cancel`).then(r => r.data),
-  exportCsv: () => window.open('/api/wastage/export'),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/wastage/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/wastage/import/confirm', { rows }).then(r => r.data),
 };
 
 // Inventory
@@ -123,12 +131,14 @@ export const storeApi = {
   update: (id: number, data: any) => api.put(`/stores/${id}`, data).then(r => r.data),
 };
 
-// Inventory Checks
-export const inventoryCheckApi = {
-  create: (data: any) => api.post('/inventory-checks', data).then(r => r.data),
-  list: (params?: any) => api.get('/inventory-checks', { params }).then(r => r.data),
-  get: (id: number) => api.get(`/inventory-checks/${id}`).then(r => r.data),
-  cancel: (id: number) => api.post(`/inventory-checks/${id}/cancel`).then(r => r.data),
+// Store Sales (巡店记录)
+export const storeSalesApi = {
+  create: (data: any) => api.post('/store-sales', data).then(r => r.data),
+  list: (params?: any) => api.get('/store-sales', { params }).then(r => r.data),
+  get: (id: number) => api.get(`/store-sales/${id}`).then(r => r.data),
+  cancel: (id: number) => api.post(`/store-sales/${id}/cancel`).then(r => r.data),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/store-sales/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/store-sales/import/confirm', { rows }).then(r => r.data),
 };
 
 // Ledger queries

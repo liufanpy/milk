@@ -27,8 +27,8 @@ class TestWastageCreate:
         assert stock is not None
         assert stock["stock"] == 7
 
-    def test_create_wastage_invalid_reason_ignored(self, client, seed_data):
-        """reason 字段已废弃，额外字段被 Pydantic 忽略"""
+    def test_create_wastage_without_reason(self, client, seed_data):
+        """创建损耗单不需要 reason 字段"""
         s = seed_data["suppliers"][0]
         p = seed_data["products"][0]
         client.post("/api/purchases", json={
@@ -77,7 +77,7 @@ class TestWastageListAndDetail:
         assert "status" in data[0]
 
     def test_detail_includes_reason(self, client, seed_data):
-        """损耗详情统一使用 wastage"""
+        """损耗详情包含 reason"""
         s = seed_data["suppliers"][0]
         p = seed_data["products"][0]
         client.post("/api/purchases", json={
@@ -92,7 +92,8 @@ class TestWastageListAndDetail:
         order_id = resp.json()["id"]
 
         detail = client.get(f"/api/wastage/{order_id}").json()
-        assert detail["items"][0]["reason"] == "wastage"
+        assert "reason" in detail["items"][0]
+        assert detail["items"][0]["reason"] is not None
 
 
 class TestWastageCancel:

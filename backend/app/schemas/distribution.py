@@ -3,25 +3,26 @@ from typing import List, Optional
 from datetime import date
 
 
-class DeliveryCreateItem(BaseModel):
+class DistributionCreateItem(BaseModel):
     product_id: int
     quantity: int
     unit_price: float
 
 
-class DeliveryCreate(BaseModel):
+class DistributionCreate(BaseModel):
     customer_id: int
     delivery_date: date
-    items: List[DeliveryCreateItem]
+    items: List[DistributionCreateItem]
     subscription_order_id: Optional[int] = None
     paid: bool = False
     note: str = ""
 
 
-class DeliveryOut(BaseModel):
+class DistributionOut(BaseModel):
     id: int
+    order_number: str
     customer_id: int
-    delivery_date: date
+    delivery_date: str
     status: str
     subscription_order_id: Optional[int] = None
     note: str

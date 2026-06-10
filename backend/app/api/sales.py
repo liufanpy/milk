@@ -1,12 +1,8 @@
-import io
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.sale_service import SaleService
 from app.schemas.sale import SaleCreate
-from app.models.retail_order import RetailOrder
-from app.models.customer import Customer
 
 router = APIRouter(prefix="/api/sales", tags=["sales"])
 
@@ -28,25 +24,21 @@ def list_sales(svc: SaleService = Depends(get_sale_service)):
     return svc.list_sales()
 
 
-# ── CSV 导出（必须在 /{order_id} 之前注册，否则路径段被当作 order_id） ──
-
 @router.get("/export")
-def export_sales(db: Session = Depends(get_db)):
-    orders = db.query(RetailOrder).order_by(RetailOrder.created_at.desc()).all()
-    customers = {c.id: c.name for c in db.query(Customer).all()}
-    csv_lines = ["客户名称,金额,状态,时间"]
-    for o in orders:
-        cname = (customers.get(o.customer_id, "散客") if o.customer_id else "散客")
-        csv_lines.append(f"{cname},,{o.status},{o.created_at}")
-    csv_content = "\n".join(csv_lines)
-    return StreamingResponse(
-        io.BytesIO(csv_content.encode("utf-8-sig")),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=sales.csv"},
-    )
+def export_sales(svc: SaleService = Depends(get_sale_service)):
+    return svc.export_csv()
 
 
-# ── 销售单详情（动态路径放在静态路径之后） ─────
+@router.post("/import")
+async def import_sales(file: UploadFile = File(...), svc: SaleService = Depends(get_sale_service)):
+    content = await file.read()
+    return svc.import_preview(content)
+
+
+@router.post("/import/confirm")
+def confirm_import(data: dict, svc: SaleService = Depends(get_sale_service)):
+    return svc.import_confirm(data.get("rows", []))
+
 
 @router.get("/{order_id}")
 def get_sale(order_id: int, svc: SaleService = Depends(get_sale_service)):

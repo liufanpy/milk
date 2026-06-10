@@ -1,12 +1,8 @@
-import io
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.purchase_service import PurchaseService
 from app.schemas.purchase import PurchaseCreate, PurchaseConfirm
-from app.models.purchase_order import PurchaseOrder
-from app.models.supplier import Supplier
 
 router = APIRouter(prefix="/api/purchases", tags=["purchases"])
 
@@ -14,8 +10,6 @@ router = APIRouter(prefix="/api/purchases", tags=["purchases"])
 def get_purchase_service(db: Session = Depends(get_db)):
     return PurchaseService(db)
 
-
-# ── 进货单 CRUD ───────────────────────────────────
 
 @router.post("", status_code=201)
 def create_purchase(data: PurchaseCreate, svc: PurchaseService = Depends(get_purchase_service)):
@@ -27,19 +21,18 @@ def list_purchases(svc: PurchaseService = Depends(get_purchase_service)):
     return svc.list_purchases()
 
 
-# ── CSV 导出/导入（必须在 /{order_id} 之前注册，否则路径段被当作 order_id） ──
-
 @router.get("/export")
-def export_purchases(db: Session = Depends(get_db)):
-    orders = db.query(PurchaseOrder).order_by(PurchaseOrder.created_at.desc()).all()
-    suppliers = {s.id: s.name for s in db.query(Supplier).all()}
-    csv_lines = ["单号,供应商,日期,金额,状态,备注"]
-    for o in orders:
-        sname = suppliers.get(o.supplier_id, "")
-        csv_lines.append(f"{o.order_number},{sname},{o.purchase_date},{o.total_amount},{o.status},{o.note or ''}")
-    csv_content = "\n".join(csv_lines)
-    return StreamingResponse(io.BytesIO(csv_content.encode("utf-8-sig")), media_type="text/csv",
-                             headers={"Content-Disposition": "attachment; filename=purchases.csv"})
+def export_purchases(svc: PurchaseService = Depends(get_purchase_service)):
+    from app.services.import_helpers import make_csv_response
+    orders = svc.list_purchases()
+    if not orders:
+        return make_csv_response([], "purchases.csv")
+    rows = [
+        {"单号": o["order_number"], "供应商": o["supplier_name"], "日期": o["purchase_date"],
+         "金额": o["total_amount"], "状态": o["status"], "备注": o.get("note", "")}
+        for o in orders
+    ]
+    return make_csv_response(rows, "purchases.csv")
 
 
 @router.post("/import")
@@ -52,8 +45,6 @@ async def import_purchases(file: UploadFile = File(...), svc: PurchaseService = 
 def confirm_import(data: dict, svc: PurchaseService = Depends(get_purchase_service)):
     return svc.import_confirm(data.get("rows", []))
 
-
-# ── 进货单 CRUD（动态路径，放在静态路径之后） ─────
 
 @router.get("/{order_id}")
 def get_purchase(order_id: int, svc: PurchaseService = Depends(get_purchase_service)):

@@ -4,7 +4,7 @@ import pytest
 
 class TestPurchaseCreate:
     def test_create_confirmed_purchase_with_unit_price(self, client, seed_data):
-        """确认入库，unit_price 写入 stock_movements"""
+        """确认入库，unit_price 写入明细"""
         s = seed_data["suppliers"][0]
         p = seed_data["products"][0]
 

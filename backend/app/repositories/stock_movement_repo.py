@@ -2,6 +2,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from app.models.stock_movement import StockMovement
+from app.enums import Direction, DocumentType
 
 
 class StockMovementRepository:
@@ -14,24 +15,9 @@ class StockMovementRepository:
         self.db.flush()
         return objs
 
-    def get_by_source(self, source_type: str, source_id: int) -> List[StockMovement]:
+    def get_by_source(self, source_id: int) -> List[StockMovement]:
         return self.db.query(StockMovement).filter(
-            StockMovement.source_type == source_type,
-            StockMovement.source_id == source_id,
-        ).all()
-
-    def get_by_source_reason(self, source_type: str, source_id: int, reason: str) -> List[StockMovement]:
-        return self.db.query(StockMovement).filter(
-            StockMovement.source_type == source_type,
-            StockMovement.source_id == source_id,
-            StockMovement.reason == reason,
-        ).all()
-
-    def get_by_source_exclude_reason(self, source_type: str, source_id: int, exclude_reason: str) -> List[StockMovement]:
-        return self.db.query(StockMovement).filter(
-            StockMovement.source_type == source_type,
-            StockMovement.source_id == source_id,
-            StockMovement.reason != exclude_reason,
+            StockMovement.source_id == source_id
         ).all()
 
     def get_inventory(self) -> list:
@@ -41,8 +27,8 @@ class StockMovementRepository:
                 StockMovement.product_id,
                 func.sum(
                     case(
-                        (StockMovement.direction == "in", StockMovement.quantity),
-                        (StockMovement.direction == "out", -StockMovement.quantity),
+                        (StockMovement.direction == Direction.in_, StockMovement.quantity),
+                        (StockMovement.direction == Direction.out, -StockMovement.quantity),
                     )
                 ).label("stock"),
             )
@@ -51,8 +37,8 @@ class StockMovementRepository:
             .having(
                 func.sum(
                     case(
-                        (StockMovement.direction == "in", StockMovement.quantity),
-                        (StockMovement.direction == "out", -StockMovement.quantity),
+                        (StockMovement.direction == Direction.in_, StockMovement.quantity),
+                        (StockMovement.direction == Direction.out, -StockMovement.quantity),
                     )
                 ) != 0
             )
@@ -66,8 +52,8 @@ class StockMovementRepository:
                 StockMovement.product_id,
                 func.sum(
                     case(
-                        (StockMovement.direction == "in", StockMovement.quantity),
-                        (StockMovement.direction == "out", -StockMovement.quantity),
+                        (StockMovement.direction == Direction.in_, StockMovement.quantity),
+                        (StockMovement.direction == Direction.out, -StockMovement.quantity),
                     )
                 ).label("stock"),
             )
@@ -76,8 +62,8 @@ class StockMovementRepository:
             .having(
                 func.sum(
                     case(
-                        (StockMovement.direction == "in", StockMovement.quantity),
-                        (StockMovement.direction == "out", -StockMovement.quantity),
+                        (StockMovement.direction == Direction.in_, StockMovement.quantity),
+                        (StockMovement.direction == Direction.out, -StockMovement.quantity),
                     )
                 ) != 0
             )
@@ -85,18 +71,18 @@ class StockMovementRepository:
         )
 
     def get_store_receive_between(self, store_id: int, product_id: int, from_date, to_date) -> int:
-        """两次盘点之间的店铺收货总量（按 delivery_date 算）"""
-        from app.models.delivery import Delivery
+        """两次盘点之间店铺收货量，JOIN distribution_orders"""
+        from app.models.distribution_order import DistributionOrder
         result = (
             self.db.query(func.sum(StockMovement.quantity))
-            .join(Delivery, (StockMovement.source_type == "delivery") & (StockMovement.source_id == Delivery.id))
+            .join(DistributionOrder, StockMovement.source_id == DistributionOrder.document_id)
             .filter(
                 StockMovement.store_id == store_id,
                 StockMovement.product_id == product_id,
-                StockMovement.reason == "distribution",
-                StockMovement.direction == "in",
-                Delivery.delivery_date >= from_date,
-                Delivery.delivery_date < to_date,
+                StockMovement.direction == Direction.in_,
+                StockMovement.source_type == DocumentType.distribution,
+                DistributionOrder.delivery_date >= from_date,
+                DistributionOrder.delivery_date < to_date,
             )
             .scalar()
         )

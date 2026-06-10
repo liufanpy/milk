@@ -7,6 +7,8 @@ class PurchaseItem(BaseModel):
     product_id: int
     quantity: int
     unit_price: float
+    production_date: Optional[date] = None
+    expiry_date: Optional[date] = None
 
 
 class PurchaseCreate(BaseModel):

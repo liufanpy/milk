@@ -29,8 +29,9 @@ export interface Supplier {
   phone: string;
 }
 
-export interface Delivery {
+export interface DistributionOrder {
   id: number;
+  order_number: string;
   customer_id: number;
   delivery_date: string;
   status: string;
@@ -38,15 +39,15 @@ export interface Delivery {
   paid_amount: number;
   unpaid_amount: number;
   note: string;
-  items?: DeliveryItem[];
+  items?: DistributionOrderItem[];
   transactions?: Transaction[];
 }
 
-export interface DeliveryItem {
+export interface DistributionOrderItem {
   product_id: number;
   quantity: number;
-  reason?: string;
-  direction?: string;
+  unit_price?: number;
+  type?: string;
 }
 
 export interface Transaction {
@@ -60,9 +61,7 @@ export interface StockMovement {
   id: number;
   product_id: number;
   direction: string;
-  reason: string;
   quantity: number;
-  unit_price?: number;
 }
 
 export interface SubscriptionOrder {
@@ -109,7 +108,7 @@ export interface SaleItem {
   unit_price: number;
 }
 
-export interface DeliveryCreateItem {
+export interface DistributionCreateItem {
   product_id: number;
   quantity: number;
   unit_price: number;
@@ -177,7 +176,7 @@ export interface Store {
   created_at: string;
 }
 
-export interface InventoryCheck {
+export interface StoreSalesOrder {
   id: number;
   order_number: string;
   store_id: number;
@@ -189,13 +188,12 @@ export interface InventoryCheck {
   created_at: string;
 }
 
-export interface InventoryCheckItem {
+export interface StoreSalesItem {
   product_id: number;
   product_name?: string;
   actual_quantity: number;
 }
 
-export interface InventoryCheckDetail extends InventoryCheck {
+export interface StoreSalesDetail extends StoreSalesOrder {
   items: any[];
-  transactions: any[];
 }

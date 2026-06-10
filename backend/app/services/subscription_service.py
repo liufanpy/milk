@@ -2,8 +2,11 @@ from sqlalchemy.orm import Session
 from app.repositories.subscription_order_repo import SubscriptionOrderRepository
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
+from app.services.document_helpers import create_document
 from app.models.subscription_order import SubscriptionOrder
+from app.models.subscription_item import SubscriptionItem
 from app.schemas.subscription import SubscriptionCreate, SubscriptionDeduct
+from app.enums import DocumentType, Direction, TransactionCategory
 
 
 class SubscriptionService:
@@ -13,37 +16,35 @@ class SubscriptionService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
-    def _next_order_number(self) -> str:
-        from app.services.order_number import next_order_number
-        return next_order_number(self.db, SubscriptionOrder, "SO")
-
     def create_order(self, data: SubscriptionCreate):
-        order = self.sub_repo.create(
+        doc = create_document(self.db, DocumentType.subscription)
+        order = SubscriptionOrder(
+            document_id=doc.id,
             customer_id=data.customer_id,
             paid_amount=data.paid_amount,
             remaining_amount=data.paid_amount,
             note=data.note,
             status="active",
         )
-        order.order_number = self._next_order_number()
+        self.db.add(order)
+
         if data.is_paid:
             self.txn_repo.create(
                 customer_id=data.customer_id,
-                category="payment",
+                category=TransactionCategory.subscription,
                 amount=data.paid_amount,
-                source_type="subscription",
-                source_id=order.id,
+                source_type=DocumentType.subscription,
+                source_id=doc.id,
             )
         self.db.commit()
         return {
-            "id": order.id,
+            "id": doc.id,
             "paid_amount": order.paid_amount,
             "remaining_amount": order.remaining_amount,
             "status": order.status,
         }
 
     def _resolve_unit_price(self, customer_id: int, product_id: int, unit_price: float | None) -> float:
-        """解析优先级：手动填入 > 客户专属价 > 等级价(批发价) > 默认零售价"""
         if unit_price is not None:
             return unit_price
 
@@ -52,7 +53,6 @@ class SubscriptionService:
         if not product:
             return 0.0
 
-        # 客户专属价
         from app.models.product_customer_price import ProductCustomerPrice
         custom = self.db.query(ProductCustomerPrice).filter(
             ProductCustomerPrice.customer_id == customer_id,
@@ -61,31 +61,27 @@ class SubscriptionService:
         if custom:
             return custom.price
 
-        # 等级价：批发客户用批发价
         from app.models.customer import Customer
         customer = self.db.query(Customer).filter(Customer.id == customer_id).first()
         if customer and customer.price_tier == "批发":
             return product.default_wholesale_price
 
-        # 默认零售价
-        return product.default_retail_price
+        return product.retail_price
 
     def _get_purchase_cost(self, product_id: int) -> float:
-        """获取产品进价（默认进货价）"""
         from app.models.product import Product
         product = self.db.query(Product).filter(Product.id == product_id).first()
         if product:
             return product.default_purchase_price
         return 0.0
 
-    def deduct(self, order_id: int, data: SubscriptionDeduct):
-        order = self.sub_repo.get_by_id(order_id)
+    def deduct(self, document_id: int, data: SubscriptionDeduct):
+        order = self.sub_repo.get_by_id(document_id)
         if not order:
             raise ValueError("订奶单不存在")
         if order.status != "active":
             raise ValueError("订奶单非活跃状态")
 
-        # 计算付费行合计并校验金额
         paid_total = 0.0
         items_for_validate = []
         for item in data.items:
@@ -101,44 +97,44 @@ class SubscriptionService:
 
         for item in data.items:
             unit_price = 0.0 if item.is_promo else self._resolve_unit_price(order.customer_id, item.product_id, item.unit_price)
-            total_price = item.quantity * unit_price
 
-            # StockMovement - 定奶出库
+            self.db.add(SubscriptionItem(
+                document_id=document_id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                unit_price=unit_price,
+                is_promo=item.is_promo,
+            ))
+
             self.stock_repo.bulk_create([{
                 "product_id": item.product_id,
-                "direction": "out",
-                "reason": "subscription",
+                "direction": Direction.out,
                 "quantity": item.quantity,
-                "unit_price": unit_price,
-                "source_type": "subscription",
-                "source_id": order_id,
+                "source_type": DocumentType.subscription,
+                "source_id": document_id,
             }])
 
             if item.is_promo:
-                # 赠送行：记促销成本
-                total_cost = 0.0
-                if unit_price == 0:
-                    purchase_cost = self._get_purchase_cost(item.product_id)
-                    total_cost = item.quantity * purchase_cost
+                purchase_cost = self._get_purchase_cost(item.product_id)
+                total_cost = item.quantity * purchase_cost
                 if total_cost > 0:
                     self.txn_repo.create(
                         customer_id=order.customer_id,
-                        category="promo",
+                        category=TransactionCategory.promo,
                         amount=-total_cost,
-                        source_type="subscription",
-                        source_id=order_id,
+                        source_type=DocumentType.subscription,
+                        source_id=document_id,
                     )
             else:
-                # 付费行：收入确认
+                total_price = item.quantity * unit_price
                 self.txn_repo.create(
                     customer_id=order.customer_id,
-                    category="subscription",
+                    category=TransactionCategory.subscription,
                     amount=total_price,
-                    source_type="subscription",
-                    source_id=order_id,
+                    source_type=DocumentType.subscription,
+                    source_id=document_id,
                 )
 
-        # 更新余额
         order.remaining_amount -= paid_total
         if order.remaining_amount <= 0:
             order.status = "completed"

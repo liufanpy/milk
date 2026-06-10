@@ -1,11 +1,10 @@
-"""测试送货单创建 — unit_price 写入 stock_movements"""
+"""测试铺货单创建"""
 import pytest
 
 
-class TestDeliveryCreate:
-    def test_create_delivery_records_unit_price(self, client, seed_data):
-        """创建送货单，stock_movements.unit_price 应写入售价"""
-        # 先备货：做一笔进货入库
+class TestDistributionCreate:
+    def test_create_distribution_records_unit_price(self, client, seed_data):
+        """创建铺货单，transaction 金额应写入售价"""
         s = seed_data["suppliers"][0]
         p = seed_data["products"][0]
         c = seed_data["customers"][0]
@@ -19,8 +18,7 @@ class TestDeliveryCreate:
             "status": "confirmed",
         })
 
-        # 创建送货单（售价不同于进价）
-        resp = client.post("/api/deliveries", json={
+        resp = client.post("/api/distribution-orders", json={
             "customer_id": c.id,
             "delivery_date": "2026-06-05",
             "items": [
@@ -29,18 +27,17 @@ class TestDeliveryCreate:
         })
 
         assert resp.status_code == 201
-        assert resp.json()["total"] == 114  # 3 × 38
+        assert resp.json()["total"] == 114
 
-        # 验证 transactions 金额
-        detail = client.get(f"/api/deliveries/{resp.json()['id']}").json()
+        detail = client.get(f"/api/distribution-orders/{resp.json()['id']}").json()
         assert detail["total_amount"] == 114
 
-    def test_delivery_insufficient_stock_fails(self, client, seed_data):
-        """库存不足时创建送货单应返回 400"""
+    def test_distribution_insufficient_stock_fails(self, client, seed_data):
+        """库存不足时创建铺货单应返回 400"""
         p = seed_data["products"][0]
         c = seed_data["customers"][0]
 
-        resp = client.post("/api/deliveries", json={
+        resp = client.post("/api/distribution-orders", json={
             "customer_id": c.id,
             "delivery_date": "2026-06-05",
             "items": [

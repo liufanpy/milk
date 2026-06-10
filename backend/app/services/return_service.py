@@ -1,12 +1,29 @@
+from datetime import datetime, date
 from sqlalchemy.orm import Session
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.repositories.return_order_repo import ReturnOrderRepository
+from app.services.document_helpers import create_document
 from app.schemas.return_schema import ReturnCreate
 from app.models.return_order import ReturnOrder
+from app.models.return_item import ReturnItem
 from app.models.transaction import Transaction
 from app.models.product import Product
 from app.models.customer import Customer
+from app.enums import DocumentType, Direction, TransactionCategory
+
+RETURN_HEADERS = ["产品名称", "product_name", "数量", "quantity", "退款金额", "unit_price", "客户名称", "customer_name", "日期", "date"]
+
+DATE_FORMATS = ["%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S"]
+
+
+def _parse_date(s: str) -> date:
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(s.strip(), fmt).date()
+        except ValueError:
+            continue
+    return date.today()
 
 
 class ReturnService:
@@ -16,95 +33,88 @@ class ReturnService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
-    def _next_order_number(self) -> str:
-        from app.services.order_number import next_order_number
-        return next_order_number(self.db, ReturnOrder, "RT")
-
     def create_return(self, data: ReturnCreate):
-        order = self.return_repo.create(
+        doc = create_document(self.db, DocumentType.return_order)
+        order = ReturnOrder(
+            document_id=doc.id,
             customer_id=data.customer_id,
             note=data.note,
         )
-        order.order_number = self._next_order_number()
+        self.db.add(order)
 
         refund_total = 0.0
         for item in data.items:
-            # 退货入库
+            self.db.add(ReturnItem(
+                document_id=doc.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+            ))
             self.stock_repo.bulk_create([{
                 "product_id": item.product_id,
-                "direction": "in",
-                "reason": "return",
+                "direction": Direction.in_,
                 "quantity": item.quantity,
-                "unit_price": item.unit_price,
-                "source_type": "return",
-                "source_id": order.id,
+                "source_type": DocumentType.return_order,
+                "source_id": doc.id,
             }])
             refund_total += item.quantity * item.unit_price
 
-        # 退款
         if refund_total > 0:
             self.txn_repo.create(
                 customer_id=data.customer_id,
-                category="refund",
+                category=TransactionCategory.refund,
                 amount=refund_total,
-                source_type="return",
-                source_id=order.id,
+                source_type=DocumentType.return_order,
+                source_id=doc.id,
             )
 
         self.db.commit()
-        return {"id": order.id, "refund_total": refund_total}
+        return {"id": doc.id, "refund_total": refund_total}
 
     def list_returns(self):
-        from app.models.stock_movement import StockMovement
-
         orders = self.return_repo.list_all()
         if not orders:
             return []
 
+        from app.models.document import Document
+        doc_ids = [o.document_id for o in orders]
         customers = {c.id: c.name for c in self.db.query(Customer).all()}
         products = {p.id: p.name for p in self.db.query(Product).all()}
+        docs = {d.id: d for d in self.db.query(Document).filter(Document.id.in_(doc_ids)).all()}
 
-        order_ids = [o.id for o in orders]
-        movements = (
-            self.db.query(StockMovement)
-            .filter(
-                StockMovement.source_type == "return",
-                StockMovement.source_id.in_(order_ids),
-                StockMovement.reason == "return",
-            )
-            .all()
-        )
+        items = self.db.query(ReturnItem).filter(ReturnItem.document_id.in_(doc_ids)).all()
         refunds = {
             t.source_id: t.amount
             for t in self.db.query(Transaction).filter(
-                Transaction.source_type == "return",
-                Transaction.source_id.in_(order_ids),
-                Transaction.category == "refund",
+                Transaction.source_type == DocumentType.return_order,
+                Transaction.source_id.in_(doc_ids),
+                Transaction.category == TransactionCategory.refund,
             ).all()
         }
 
         order_items: dict[int, list] = {}
-        for m in movements:
-            order_items.setdefault(m.source_id, []).append(m)
+        for it in items:
+            order_items.setdefault(it.document_id, []).append(it)
 
         result = []
         for o in orders:
-            items = order_items.get(o.id, [])
+            o_items = order_items.get(o.document_id, [])
             parts = []
-            for m in items[:2]:
-                pname = products.get(m.product_id, "")
-                parts.append(f"{pname}×{m.quantity}")
+            for it in o_items[:2]:
+                pname = products.get(it.product_id, "")
+                parts.append(f"{pname}×{it.quantity}")
             summary = "、".join(parts)
-            if len(items) > 2:
-                summary += f" 等{len(items)}件"
+            if len(o_items) > 2:
+                summary += f" 等{len(o_items)}件"
 
+            doc = docs.get(o.document_id)
             result.append({
-                "id": o.id,
-                "order_number": o.order_number,
+                "id": o.document_id,
+                "order_number": doc.order_number if doc else "",
                 "customer_id": o.customer_id,
                 "customer_name": customers.get(o.customer_id, ""),
-                "item_count": len(items),
-                "total_refund": refunds.get(o.id, 0),
+                "item_count": len(o_items),
+                "total_refund": refunds.get(o.document_id, 0),
                 "note": o.note,
                 "status": o.status,
                 "items_summary": summary,
@@ -113,85 +123,83 @@ class ReturnService:
 
         return result
 
-    def get_return_detail(self, order_id: int):
-        order = self.return_repo.get_by_id(order_id)
+    def get_return_detail(self, document_id: int):
+        from app.models.document import Document
+        order = self.return_repo.get_by_id(document_id)
         if not order:
             return None
 
-        items = self.stock_repo.get_by_source("return", order_id)
+        doc = self.db.query(Document).filter(Document.id == document_id).first()
+        items = self.db.query(ReturnItem).filter(ReturnItem.document_id == document_id).all()
         products = {p.id: p.name for p in self.db.query(Product).all()}
         customers = {c.id: c.name for c in self.db.query(Customer).all()}
 
         refunds = (
             self.db.query(Transaction)
             .filter(
-                Transaction.source_type == "return",
-                Transaction.source_id == order_id,
-                Transaction.category == "refund",
+                Transaction.source_type == DocumentType.return_order,
+                Transaction.source_id == document_id,
+                Transaction.category == TransactionCategory.refund,
             ).all()
         )
         total_refund = sum(t.amount for t in refunds)
 
-        def item_dict(m):
+        def item_dict(it):
             return {
-                "product_id": m.product_id,
-                "product_name": products.get(m.product_id, ""),
-                "quantity": m.quantity,
-                "unit_price": m.unit_price or 0,
+                "product_id": it.product_id,
+                "product_name": products.get(it.product_id, ""),
+                "quantity": it.quantity,
+                "unit_price": it.unit_price,
             }
 
         return {
-            "id": order.id,
-            "order_number": order.order_number,
+            "id": document_id,
+            "order_number": doc.order_number if doc else "",
             "customer_id": order.customer_id,
             "customer_name": customers.get(order.customer_id, ""),
             "item_count": len(items),
             "total_refund": total_refund,
             "note": order.note,
             "status": order.status,
-            "items": [item_dict(m) for m in items if m.direction == "in" and m.reason == "return"],
+            "items": [item_dict(it) for it in items],
             "transactions": [
-                {"id": t.id, "category": t.category, "amount": t.amount, "created_at": str(t.created_at)}
+                {"id": t.id, "category": t.category.value if hasattr(t.category, 'value') else t.category,
+                 "amount": t.amount, "created_at": str(t.created_at)}
                 for t in refunds
             ],
             "created_at": str(order.created_at),
         }
 
-    def cancel_return(self, order_id: int):
-        order = self.return_repo.get_by_id(order_id)
+    def cancel_return(self, document_id: int):
+        order = self.return_repo.get_by_id(document_id)
         if not order:
             raise ValueError("退货单不存在")
         if order.status == "cancelled":
             raise ValueError("该退货单已撤销")
 
-        # 查原始记录
-        original_items = self.stock_repo.get_by_source("return", order_id)
-        # 校验：已重新售出的退货不能撤销
+        original_items = self.stock_repo.get_by_source(document_id)
         inventory = {r.product_id: r.stock for r in self.stock_repo.get_inventory()}
         for m in original_items:
-            if m.direction == "in":
+            if m.direction == Direction.in_:
                 stock = inventory.get(m.product_id, 0)
                 if stock < m.quantity:
                     raise ValueError("退货商品已被售出，库存不足，无法撤销")
+
         for m in original_items:
-            # 反向冲抵库存
-            reverse_dir = "out" if m.direction == "in" else "in"
+            reverse_dir = Direction.out if m.direction == Direction.in_ else Direction.in_
             self.stock_repo.bulk_create([{
                 "product_id": m.product_id,
                 "direction": reverse_dir,
-                "reason": "cancel",
                 "quantity": m.quantity,
-                "unit_price": m.unit_price or 0,
-                "source_type": "return",
-                "source_id": order_id,
+                "source_type": DocumentType.return_order,
+                "source_id": document_id,
             }])
 
-        # 反向冲抵账务
         original_txns = (
             self.db.query(Transaction)
             .filter(
-                Transaction.source_type == "return",
-                Transaction.source_id == order_id,
+                Transaction.source_type == DocumentType.return_order,
+                Transaction.source_id == document_id,
             )
             .all()
         )
@@ -200,10 +208,127 @@ class ReturnService:
                 customer_id=order.customer_id,
                 category=t.category,
                 amount=-t.amount,
-                source_type="return",
-                source_id=order_id,
+                source_type=DocumentType.return_order,
+                source_id=document_id,
             )
 
-        self.return_repo.update_status(order_id, "cancelled")
+        self.return_repo.update_status(document_id, "cancelled")
         self.db.commit()
-        return {"id": order.id, "status": "cancelled"}
+        return {"id": document_id, "status": "cancelled"}
+
+    def _name_maps(self):
+        prods = {p.name: (p.id, p.retail_price) for p in self.db.query(Product).all()}
+        customers = {c.name: c.id for c in self.db.query(Customer).all()}
+        return prods, customers
+
+    def import_preview(self, file_content: bytes) -> dict:
+        prods, customers = self._name_maps()
+
+        def validate(row: dict) -> str | bool:
+            pname = (row.get("产品名称") or row.get("product_name") or "").strip()
+            if not pname:
+                return "产品名称为空"
+            if pname not in prods:
+                return f"产品'{pname}'不存在"
+            qty = row.get("数量") or row.get("quantity") or "0"
+            try:
+                if int(float(qty)) <= 0:
+                    return "数量必须大于0"
+            except ValueError:
+                return "数量格式错误"
+            cname = (row.get("客户名称") or row.get("customer_name") or "").strip()
+            if not cname:
+                return "客户名称为空"
+            if cname not in customers:
+                return f"客户'{cname}'不存在"
+            return True
+
+        from app.services.csv_importer import parse_csv
+        return parse_csv(file_content, validate, RETURN_HEADERS)
+
+    def import_confirm(self, rows: list[dict]) -> dict:
+        prods, customers = self._name_maps()
+        success = 0
+        errors: list[dict] = []
+
+        groups: dict[tuple, list[dict]] = {}
+        for row in rows:
+            data = row.get("data", row)
+            cname = (data.get("客户名称") or data.get("customer_name") or "").strip()
+            date_str = (data.get("日期") or data.get("date") or "").strip()
+            key = (cname, date_str or str(date.today()))
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(data)
+
+        for (cname, _), items in groups.items():
+            cid = customers.get(cname)
+            if not cid:
+                continue
+
+            doc = create_document(self.db, DocumentType.return_order)
+            order = ReturnOrder(document_id=doc.id, customer_id=cid)
+            self.db.add(order)
+
+            refund_total = 0.0
+            for data in items:
+                pname = (data.get("产品名称") or data.get("product_name") or "").strip()
+                p = prods.get(pname)
+                if not p:
+                    errors.append({"row": data.get("index", "?"), "msg": f"产品'{pname}'不存在"})
+                    continue
+                pid, default_price = p
+                qty = int(float(data.get("数量") or data.get("quantity") or 0))
+                price = data.get("退款金额") or data.get("unit_price") or ""
+                price = float(price) if price else default_price
+                refund_total += qty * price
+
+                self.db.add(ReturnItem(document_id=doc.id, product_id=pid, quantity=qty, unit_price=price))
+                self.stock_repo.bulk_create([{
+                    "product_id": pid,
+                    "direction": Direction.in_,
+                    "quantity": qty,
+                    "source_type": DocumentType.return_order,
+                    "source_id": doc.id,
+                }])
+
+            if refund_total > 0:
+                self.txn_repo.create(
+                    customer_id=cid,
+                    category=TransactionCategory.refund,
+                    amount=refund_total,
+                    source_type=DocumentType.return_order,
+                    source_id=doc.id,
+                )
+            success += len(items)
+
+        self.db.commit()
+        return {"success": success, "errors": errors}
+
+    def export_csv(self):
+        from app.models.document import Document
+        products = {p.id: p.name for p in self.db.query(Product).all()}
+        customers = {c.id: c.name for c in self.db.query(Customer).all()}
+
+        rows = []
+        items = (
+            self.db.query(ReturnItem, Document, ReturnOrder)
+            .join(Document, ReturnItem.document_id == Document.id)
+            .join(ReturnOrder, ReturnItem.document_id == ReturnOrder.document_id)
+            .order_by(Document.created_at.desc())
+            .all()
+        )
+
+        for item, doc, order in items:
+            rows.append({
+                "单号": doc.order_number,
+                "客户": customers.get(order.customer_id, ""),
+                "日期": str(order.created_at.date()) if order.created_at else "",
+                "品名": products.get(item.product_id, ""),
+                "数量": item.quantity,
+                "退款金额": item.unit_price * item.quantity,
+                "关联铺货单": order.original_distribution_document_id or "",
+            })
+
+        from app.services.import_helpers import make_csv_response
+        return make_csv_response(rows, "return_export.csv")

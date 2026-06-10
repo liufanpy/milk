@@ -88,7 +88,7 @@ export default function WastagePage() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">损耗管理</h2>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={() => wastageApi.exportCsv()}>导出 CSV</Button>
+          <Button variant="secondary" size="sm" onClick={() => window.open('/api/wastage/export')}>导出 CSV</Button>
           <Button onClick={() => setFormOpen(true)}>+ 新建损耗</Button>
         </div>
       </div>

@@ -9,10 +9,10 @@ import { OrderListTable } from '../components/business/OrderListTable';
 import { OrderFormModal } from '../components/business/OrderFormModal';
 import { OrderDetailModal } from '../components/business/OrderDetailModal';
 import { StatusBadge } from '../components/ui/StatusBadge';
-import { useDeliveries, useCreateDelivery, useSettleDelivery, useExchangeDelivery } from '../hooks/useDeliveries';
-import { deliveryApi, customerApi, productApi } from '../services/api';
+import { useDistributions, useCreateDistribution, useSettleDistribution, useExchangeDistribution } from '../hooks/useDistribution';
+import { distributionApi, customerApi, productApi } from '../services/api';
 
-interface DeliveryItem {
+interface DistributionCreateItem {
   product_id: number;
   quantity: number;
   unit_price: number;
@@ -24,11 +24,11 @@ const deliveryStatusConfig: Record<string, { label: string; variant: 'success' |
   settled: { label: '已结算', variant: 'success' },
 };
 
-export default function DeliveriesPage() {
+export default function DistributionPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [customerId, setCustomerId] = useState<number | string>('');
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
-  const [items, setItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
+  const [items, setItems] = useState<DistributionCreateItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
   const [paid, setPaid] = useState(false);
   const [note, setNote] = useState('');
   const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
@@ -36,25 +36,25 @@ export default function DeliveriesPage() {
 
   const [filterCustomer, setFilterCustomer] = useState<string | number>('');
   const [filterStatus, setFilterStatus] = useState('');
-  const { data: deliveries = [], refetch } = useDeliveries();
-  const createMutation = useCreateDelivery();
-  const settleMutation = useSettleDelivery();
-  const exchangeMutation = useExchangeDelivery();
+  const { data: distributions = [], refetch } = useDistributions();
+  const createMutation = useCreateDistribution();
+  const settleMutation = useSettleDistribution();
+  const exchangeMutation = useExchangeDistribution();
 
   const [selectedDelivery, setSelectedDelivery] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [settleAmount, setSettleAmount] = useState(0);
   const [settleOpen, setSettleOpen] = useState(false);
   const [exchangeOpen, setExchangeOpen] = useState(false);
-  const [returnItems, setReturnItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
-  const [newItems, setNewItems] = useState<DeliveryItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
+  const [returnItems, setReturnItems] = useState<DistributionCreateItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
+  const [newItems, setNewItems] = useState<DistributionCreateItem[]>([{ product_id: 0, quantity: 1, unit_price: 0 }]);
 
   useEffect(() => {
     customerApi.list().then((data: any) => setCustomerNames(Object.fromEntries(data.map((c: any) => [c.id, c.name]))));
     productApi.list().then((data: any) => setProductNames(Object.fromEntries(data.map((p: any) => [p.id, p.name]))));
   }, []);
 
-  const updateItem = (idx: number, field: keyof DeliveryItem, value: number | boolean) =>
+  const updateItem = (idx: number, field: keyof DistributionCreateItem, value: number | boolean) =>
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
 
   const onProductChange = async (idx: number, productId: number) => {
@@ -79,7 +79,7 @@ export default function DeliveriesPage() {
         paid,
         note,
       });
-      alert('送货单创建成功');
+      alert('铺货单创建成功');
       setCustomerId(''); setItems([{ product_id: 0, quantity: 1, unit_price: 0 }]); setNote('');
       setFormOpen(false);
       refetch();
@@ -89,7 +89,7 @@ export default function DeliveriesPage() {
   };
 
   const openDetail = async (d: any) => {
-    const detail = await deliveryApi.get(d.id);
+    const detail = await distributionApi.get(d.id);
     setSelectedDelivery(detail);
     setDetailOpen(true);
   };
@@ -99,7 +99,7 @@ export default function DeliveriesPage() {
     await settleMutation.mutateAsync({ id: selectedDelivery.id, amount: settleAmount });
     alert('结算成功');
     setSettleOpen(false);
-    const detail = await deliveryApi.get(selectedDelivery.id);
+    const detail = await distributionApi.get(selectedDelivery.id);
     setSelectedDelivery(detail);
     refetch();
   };
@@ -144,7 +144,7 @@ export default function DeliveriesPage() {
       setExchangeOpen(false);
       setReturnItems([{ product_id: 0, quantity: 1, unit_price: 0 }]);
       setNewItems([{ product_id: 0, quantity: 1, unit_price: 0 }]);
-      const detail = await deliveryApi.get(selectedDelivery.id);
+      const detail = await distributionApi.get(selectedDelivery.id);
       setSelectedDelivery(detail);
       refetch();
     } catch (err: any) {
@@ -152,7 +152,7 @@ export default function DeliveriesPage() {
     }
   };
 
-  const filtered = deliveries.filter((d: any) => {
+  const filtered = distributions.filter((d: any) => {
     if (filterCustomer && String(d.customer_id) !== String(filterCustomer)) return false;
     if (filterStatus && d.status !== filterStatus) return false;
     return true;
@@ -182,20 +182,20 @@ export default function DeliveriesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">送货单管理</h2>
+        <h2 className="text-xl font-bold">铺货单管理</h2>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm" onClick={() => window.open('/api/deliveries/export')}>导出 CSV</Button>
-          <Button onClick={() => setFormOpen(true)}>+ 新建送货</Button>
+          <Button variant="secondary" size="sm" onClick={() => window.open('/api/distribution-orders/export')}>导出 CSV</Button>
+          <Button onClick={() => setFormOpen(true)}>+ 新建铺货</Button>
         </div>
       </div>
 
       <OrderFormModal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title="新建送货单"
+        title="新建铺货单"
         onSubmit={handleCreate}
         isPending={createMutation.isPending}
-        submitLabel="提交送货单"
+        submitLabel="提交铺货单"
       >
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -226,7 +226,7 @@ export default function DeliveriesPage() {
       </OrderFormModal>
 
       <div className="bg-white rounded-lg border p-4">
-        <h3 className="font-semibold mb-3">送货单列表</h3>
+        <h3 className="font-semibold mb-3">铺货单列表</h3>
         <div className="flex gap-3 mb-3">
           <CustomerSelect value={filterCustomer} onChange={(v) => setFilterCustomer(v)} priceTier="批发" />
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="border rounded px-3 py-2 text-sm">
@@ -248,7 +248,7 @@ export default function DeliveriesPage() {
       <OrderDetailModal
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
-        title={`送货单 #${selectedDelivery?.id}`}
+        title={`铺货单 #${selectedDelivery?.id}`}
         headerInfo={
           <>
             <div>客户: {customerNames[selectedDelivery?.customer_id] || `客户#${selectedDelivery?.customer_id}`}</div>

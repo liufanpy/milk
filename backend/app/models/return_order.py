@@ -6,10 +6,10 @@ from app.database import Base
 class ReturnOrder(Base):
     __tablename__ = "return_orders"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), primary_key=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
-    order_number = Column(String(20), nullable=True, unique=True, index=True)
-    note = Column(String(500), default="")
+    original_distribution_document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
     status = Column(String(20), default="confirmed")
+    note = Column(String(500), default="")
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

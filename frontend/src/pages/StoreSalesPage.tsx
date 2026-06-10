@@ -3,18 +3,18 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { OrderListTable } from '../components/business/OrderListTable';
 import { OrderDetailModal } from '../components/business/OrderDetailModal';
-import { storeApi, productApi, inventoryCheckApi } from '../services/api';
-import type { InventoryCheck, InventoryCheckDetail } from '../types';
+import { storeApi, productApi, storeSalesApi } from '../services/api';
+import type { StoreSalesOrder, StoreSalesDetail } from '../types';
 
-export default function InventoryCheckPage() {
+export default function StoreSalesPage() {
   const [stores, setStores] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [storeId, setStoreId] = useState<number | string>('');
   const [checkDate, setCheckDate] = useState(new Date().toISOString().slice(0, 10));
   const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const [checks, setChecks] = useState<InventoryCheck[]>([]);
+  const [checks, setChecks] = useState<StoreSalesOrder[]>([]);
   const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState<InventoryCheckDetail | null>(null);
+  const [detail, setDetail] = useState<StoreSalesDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function InventoryCheckPage() {
     loadChecks();
   }, []);
 
-  const loadChecks = () => inventoryCheckApi.list().then(setChecks);
+  const loadChecks = () => storeSalesApi.list().then(setChecks);
 
   const handleConfirm = async () => {
     if (!storeId) { alert('请选店铺'); return; }
@@ -37,7 +37,7 @@ export default function InventoryCheckPage() {
 
     setLoading(true);
     try {
-      await inventoryCheckApi.create({ store_id: Number(storeId), check_date: checkDate, items });
+      await storeSalesApi.create({ store_id: Number(storeId), check_date: checkDate, items });
       setQuantities({});
       loadChecks();
     } catch (err: any) {
@@ -46,14 +46,14 @@ export default function InventoryCheckPage() {
   };
 
   const openDetail = async (id: number) => {
-    const d = await inventoryCheckApi.get(id);
+    const d = await storeSalesApi.get(id);
     setDetail(d);
     setDetailOpen(true);
   };
 
   const handleCancel = async (id: number) => {
     if (!confirm('确定撤销？')) return;
-    await inventoryCheckApi.cancel(id);
+    await storeSalesApi.cancel(id);
     loadChecks();
   };
 
@@ -77,10 +77,10 @@ export default function InventoryCheckPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">盘点管理</h2>
+      <h2 className="text-xl font-bold mb-4">巡店管理</h2>
 
       <div className="bg-white rounded-lg border p-4 mb-6">
-        <h3 className="font-semibold mb-3">新建盘点</h3>
+        <h3 className="font-semibold mb-3">新建巡店</h3>
         <div className="flex gap-4 mb-4">
           <select
             value={storeId}
@@ -112,11 +112,11 @@ export default function InventoryCheckPage() {
           ))}
         </div>
         <div className="mt-4">
-          <Button onClick={handleConfirm} disabled={loading}>确认盘点</Button>
+          <Button onClick={handleConfirm} disabled={loading}>确认巡店</Button>
         </div>
       </div>
 
-      <h3 className="text-lg font-semibold mb-2">盘点记录</h3>
+      <h3 className="text-lg font-semibold mb-2">巡店记录</h3>
       <OrderListTable
         columns={columns}
         data={checks}
@@ -127,7 +127,7 @@ export default function InventoryCheckPage() {
       <OrderDetailModal
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
-        title={`盘点详情 — ${detail?.order_number || ''}`}
+        title={`巡店详情 — ${detail?.order_number || ''}`}
         headerInfo={
           <>
             <div>店铺: {detail?.store_name}</div>

@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.subscription_service import SubscriptionService
 from app.schemas.subscription import SubscriptionCreate, SubscriptionDeduct
-from app.repositories.stock_movement_repo import StockMovementRepository
-from app.models.stock_movement import StockMovement
+from app.models.subscription_item import SubscriptionItem
+from app.models.document import Document
 
 router = APIRouter(prefix="/api/subscription-orders", tags=["subscriptions"])
 
@@ -39,11 +39,12 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
     if not order:
         raise HTTPException(status_code=404, detail="订奶单不存在")
 
-    stock_repo = StockMovementRepository(db)
-    movements = stock_repo.get_by_source("subscription", order_id)
+    doc = db.query(Document).filter(Document.id == order_id).first()
+    items = db.query(SubscriptionItem).filter(SubscriptionItem.document_id == order_id).all()
 
     return {
-        "id": order.id,
+        "id": order_id,
+        "order_number": doc.order_number if doc else "",
         "customer_id": order.customer_id,
         "paid_amount": order.paid_amount,
         "remaining_amount": order.remaining_amount,
@@ -52,12 +53,12 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
         "created_at": str(order.created_at),
         "deductions": [
             {
-                "id": m.id,
-                "product_id": m.product_id,
-                "quantity": m.quantity,
-                "unit_price": m.unit_price,
-                "created_at": str(m.created_at),
+                "id": it.id,
+                "product_id": it.product_id,
+                "quantity": it.quantity,
+                "unit_price": it.unit_price,
+                "is_promo": it.is_promo,
             }
-            for m in movements
+            for it in items
         ],
     }

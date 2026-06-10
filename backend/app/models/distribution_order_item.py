@@ -1,0 +1,15 @@
+from sqlalchemy import Column, Integer, Float, String, ForeignKey
+from app.database import Base
+
+
+class DistributionOrderItem(Base):
+    __tablename__ = "distribution_order_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Float, default=0.0)
+    discount = Column(Float, default=0.0)
+    discount_reason = Column(String(50), default="")
+    type = Column(String(20), nullable=True)

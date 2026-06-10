@@ -13,8 +13,8 @@ class SubscriptionOrderRepository:
         self.db.flush()
         return order
 
-    def get_by_id(self, id: int) -> Optional[SubscriptionOrder]:
-        return self.db.query(SubscriptionOrder).filter(SubscriptionOrder.id == id).first()
+    def get_by_id(self, document_id: int) -> Optional[SubscriptionOrder]:
+        return self.db.query(SubscriptionOrder).filter(SubscriptionOrder.document_id == document_id).first()
 
     def list_all(self):
         return self.db.query(SubscriptionOrder).order_by(SubscriptionOrder.created_at.desc()).all()

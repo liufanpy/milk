@@ -3,19 +3,19 @@ from typing import List
 from datetime import date
 
 
-class CheckItem(BaseModel):
+class StoreSalesItem(BaseModel):
     product_id: int
     actual_quantity: int
 
 
-class InventoryCheckCreate(BaseModel):
+class StoreSalesCreate(BaseModel):
     store_id: int
     check_date: date
-    items: List[CheckItem]
+    items: List[StoreSalesItem]
     note: str = ""
 
 
-class InventoryCheckOut(BaseModel):
+class StoreSalesOut(BaseModel):
     id: int
     order_number: str
     store_id: int

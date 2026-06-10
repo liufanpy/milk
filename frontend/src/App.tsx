@@ -4,14 +4,13 @@ import Layout from './components/Layout';
 
 const queryClient = new QueryClient();
 
-// Lazy imports for pages
 import DashboardPage from './pages/DashboardPage';
 import ProductsPage from './pages/ProductsPage';
 import CustomersPage from './pages/CustomersPage';
 import SuppliersPage from './pages/SuppliersPage';
 import PurchasesPage from './pages/PurchasesPage';
 import SalesPage from './pages/SalesPage';
-import DeliveriesPage from './pages/DeliveriesPage';
+import DistributionPage from './pages/DistributionPage';
 import ReturnsPage from './pages/ReturnsPage';
 import WastagePage from './pages/WastagePage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
@@ -21,7 +20,7 @@ import OperationLogsPage from './pages/OperationLogsPage';
 import StockLedgerPage from './pages/StockLedgerPage';
 import TransactionLedgerPage from './pages/TransactionLedgerPage';
 import StoresPage from './pages/StoresPage';
-import InventoryCheckPage from './pages/InventoryCheckPage';
+import StoreSalesPage from './pages/StoreSalesPage';
 
 export default function App() {
   return (
@@ -35,7 +34,7 @@ export default function App() {
             <Route path="/suppliers" element={<SuppliersPage />} />
             <Route path="/purchases" element={<PurchasesPage />} />
             <Route path="/sales" element={<SalesPage />} />
-            <Route path="/deliveries" element={<DeliveriesPage />} />
+            <Route path="/distribution-orders" element={<DistributionPage />} />
             <Route path="/returns" element={<ReturnsPage />} />
             <Route path="/wastage" element={<WastagePage />} />
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
@@ -43,7 +42,7 @@ export default function App() {
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/logs" element={<OperationLogsPage />} />
             <Route path="/stores" element={<StoresPage />} />
-            <Route path="/inventory-checks" element={<InventoryCheckPage />} />
+            <Route path="/store-sales" element={<StoreSalesPage />} />
             <Route path="/stock-ledger" element={<StockLedgerPage />} />
             <Route path="/transaction-ledger" element={<TransactionLedgerPage />} />
           </Route>
