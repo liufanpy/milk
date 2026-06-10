@@ -152,7 +152,7 @@ class DeliveryService:
                     "quantity": m.quantity,
                     "unit_price": m.unit_price or 0,
                 }
-                for m in movements if m.reason != "exchange"
+                for m in movements if m.reason == "distribution"
             ],
             "total_amount": net,
             "paid_amount": paid_total,

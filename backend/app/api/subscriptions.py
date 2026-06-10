@@ -40,7 +40,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="订奶单不存在")
 
     stock_repo = StockMovementRepository(db)
-    movements = stock_repo.get_by_subscription_order(order_id)
+    movements = stock_repo.get_by_source("subscription", order_id)
 
     return {
         "id": order.id,

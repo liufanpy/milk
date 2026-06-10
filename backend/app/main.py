@@ -15,13 +15,16 @@ async def lifespan(app: FastAPI):
     from sqlalchemy import text, inspect
     insp = inspect(engine)
 
-    # 新增列列表
+    # 兼容已有数据库: 确保 source 多态列存在
     new_cols = [
-        ("stock_movements", "purchase_order_id", "INTEGER REFERENCES purchase_orders(id)"),
-        ("transactions", "purchase_order_id", "INTEGER REFERENCES purchase_orders(id)"),
-        ("stock_movements", "retail_order_id", "INTEGER REFERENCES retail_orders(id)"),
-        ("transactions", "subscription_order_id", "INTEGER REFERENCES subscription_orders(id)"),
-        ("transactions", "retail_order_id", "INTEGER REFERENCES retail_orders(id)"),
+        ("stock_movements", "source_type", "VARCHAR(20)"),
+        ("stock_movements", "source_id", "INTEGER"),
+        ("stock_movements", "store_id", "INTEGER REFERENCES stores(id)"),
+        ("stock_movements", "customer_id", "INTEGER REFERENCES customers(id)"),
+        ("transactions", "source_type", "VARCHAR(20)"),
+        ("transactions", "source_id", "INTEGER"),
+        ("transactions", "store_id", "INTEGER REFERENCES stores(id)"),
+        ("deliveries", "store_id", "INTEGER REFERENCES stores(id)"),
     ]
     for table, col, col_type in new_cols:
         cols = [c["name"] for c in insp.get_columns(table)]
