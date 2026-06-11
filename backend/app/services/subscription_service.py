@@ -31,7 +31,7 @@ class SubscriptionService:
         if data.is_paid:
             self.txn_repo.create(
                 customer_id=data.customer_id,
-                category=TransactionCategory.subscription,
+                category=TransactionCategory.payment,
                 amount=data.paid_amount,
                 source_type=DocumentType.subscription,
                 source_id=doc.id,
@@ -66,7 +66,7 @@ class SubscriptionService:
         if customer and customer.price_tier == "批发":
             return product.default_wholesale_price
 
-        return product.retail_price
+        return product.default_retail_price
 
     def _get_purchase_cost(self, product_id: int) -> float:
         from app.models.product import Product
