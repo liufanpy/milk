@@ -2,9 +2,18 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardApi, productApi, customerApi } from '../services/api';
 import { Badge } from '../components/ui/Badge';
+import { TimeRangeFilter, type DateRange } from '../components/business/TimeRangeFilter';
+
+function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 export default function DashboardPage() {
-  const { data, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.get });
+  const [range, setRange] = useState<DateRange>({ date_from: todayStr(), date_to: todayStr() });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard', range],
+    queryFn: () => dashboardApi.get(range.date_from, range.date_to),
+  });
+
   const { data: receivables = [] } = useQuery({ queryKey: ['receivables'], queryFn: dashboardApi.getReceivables });
   const [productNames, setProductNames] = useState<Record<number, string>>({});
   const [customerNames, setCustomerNames] = useState<Record<number, string>>({});
@@ -19,18 +28,34 @@ export default function DashboardPage() {
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">经营看板</h2>
-      <div className="grid grid-cols-3 gap-4 mb-6">
+
+      <TimeRangeFilter value={range} onChange={setRange} />
+
+      <div className="grid grid-cols-3 gap-4 mb-4">
         <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-gray-500">今日零售</div>
-          <div className="text-2xl font-bold text-green-600">¥{data?.today_sales || 0}</div>
+          <div className="text-sm text-gray-500">销售额</div>
+          <div className="text-2xl font-bold text-green-600">¥{data?.total_sales || 0}</div>
         </div>
         <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-gray-500">今日收款</div>
-          <div className="text-2xl font-bold text-blue-600">¥{data?.today_payments || 0}</div>
+          <div className="text-sm text-gray-500">收款</div>
+          <div className="text-2xl font-bold text-blue-600">¥{data?.total_payments || 0}</div>
         </div>
         <div className="bg-white rounded-lg border p-4">
-          <div className="text-sm text-gray-500">今日出库</div>
-          <div className="text-2xl font-bold">{data?.today_out_quantity || 0} 件</div>
+          <div className="text-sm text-gray-500">成本</div>
+          <div className="text-2xl font-bold text-gray-600">¥{data?.total_cost || 0}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-lg border p-4">
+          <div className="text-sm text-gray-500">出库量</div>
+          <div className="text-2xl font-bold">{data?.total_out_quantity || 0} 件</div>
+        </div>
+        <div className="bg-white rounded-lg border p-4">
+          <div className="text-sm text-gray-500">毛利</div>
+          <div className={`text-2xl font-bold ${(data?.total_gross_profit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            ¥{data?.total_gross_profit || 0}
+          </div>
         </div>
       </div>
 

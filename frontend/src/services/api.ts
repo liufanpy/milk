@@ -117,7 +117,8 @@ export const subscriptionApi = {
 
 // Dashboard & queries
 export const dashboardApi = {
-  get: () => api.get('/dashboard').then(r => r.data),
+  get: (date_from: string, date_to: string) =>
+    api.get('/dashboard', { params: { date_from, date_to } }).then(r => r.data),
   getReceivables: () => api.get('/receivables').then(r => r.data),
   getInventory: () => api.get('/inventory').then(r => r.data),
   getOperationLogs: () => api.get('/operation-logs').then(r => r.data),
@@ -129,6 +130,9 @@ export const storeApi = {
   get: (id: number) => api.get(`/stores/${id}`).then(r => r.data),
   create: (data: any) => api.post('/stores', data).then(r => r.data),
   update: (id: number, data: any) => api.put(`/stores/${id}`, data).then(r => r.data),
+  delete: (id: number) => api.delete(`/stores/${id}`).then(r => r.data),
+  importFile: (file: File) => { const fd = new FormData(); fd.append('file', file); return api.post('/stores/import', fd).then(r => r.data); },
+  confirmImport: (rows: any[]) => api.post('/stores/import/confirm', { rows }).then(r => r.data),
 };
 
 // Store Sales (巡店记录)
