@@ -21,7 +21,10 @@ def create_inventory_check(
     db: Session = Depends(get_db),
 ):
     svc = InventoryCheckService(db)
-    d = date.fromisoformat(check_date) if check_date else None
+    try:
+        d = date.fromisoformat(check_date) if check_date else None
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"无效的日期格式: {check_date}")
     return svc.create(check_date=d, note=note)
 
 
