@@ -11,4 +11,5 @@ class InventoryCheck(Base):
     status = Column(String(20), default="draft")
     note = Column(String(500), default="")
     created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     confirmed_at = Column(DateTime, nullable=True)
