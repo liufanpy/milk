@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -36,8 +36,7 @@ def get_inventory_check(document_id: int, db: Session = Depends(get_db)):
     svc = InventoryCheckService(db)
     result = svc.get_detail(document_id)
     if not result:
-        from fastapi.responses import JSONResponse
-        return JSONResponse({"detail": "盘点单不存在"}, status_code=404)
+        raise HTTPException(status_code=404, detail="盘点单不存在")
     return result
 
 
@@ -48,10 +47,16 @@ def save_inventory_check_items(
     db: Session = Depends(get_db),
 ):
     svc = InventoryCheckService(db)
-    return svc.save_items(document_id, body.items)
+    try:
+        return svc.save_items(document_id, body.items)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{document_id}/confirm")
 def confirm_inventory_check(document_id: int, db: Session = Depends(get_db)):
     svc = InventoryCheckService(db)
-    return svc.confirm(document_id)
+    try:
+        return svc.confirm(document_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
