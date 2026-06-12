@@ -10,6 +10,7 @@ PREFIX_MAP = {
     DocumentType.wastage: "WO",
     DocumentType.subscription: "SO",
     DocumentType.store_sales: "SS",
+    DocumentType.inventory_check: "IC",
 }
 
 

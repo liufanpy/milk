@@ -9,6 +9,7 @@ class DocumentType(str, Enum):
     wastage = "wastage"
     subscription = "subscription"
     store_sales = "store_sales"
+    inventory_check = "inventory_check"
 
 
 class Direction(str, Enum):
