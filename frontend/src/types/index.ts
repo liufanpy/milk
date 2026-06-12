@@ -197,3 +197,22 @@ export interface StoreSalesItem {
 export interface StoreSalesDetail extends StoreSalesOrder {
   items: any[];
 }
+
+export interface InventoryCheck {
+  id: number;
+  order_number: string;
+  check_date: string;
+  status: string;
+  item_count: number;
+  note?: string;
+  confirmed_at?: string;
+  created_at?: string;
+}
+
+export interface InventoryCheckItem {
+  product_id: number;
+  product_name: string;
+  theoretical_qty: number;
+  actual_qty: number | null;
+  difference: number | null;
+}

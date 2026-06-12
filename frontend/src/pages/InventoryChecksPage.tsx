@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { inventoryCheckApi } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { OrderListTable } from '../components/business/OrderListTable';
+import { InventoryCheck, InventoryCheckItem } from '../types';
 
 const STATUS_LABELS: Record<string, string> = { draft: '草稿', confirmed: '已确认' };
 
@@ -12,13 +13,15 @@ export default function InventoryChecksPage() {
   const documentId = id ? Number(id) : null;
 
   // list state
-  const [checks, setChecks] = useState<any[]>([]);
+  const [checks, setChecks] = useState<InventoryCheck[]>([]);
   const [listLoading, setListLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   // detail state
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<InventoryCheck | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<InventoryCheckItem[]>([]);
 
   useEffect(() => {
     if (documentId) {
@@ -61,6 +64,7 @@ export default function InventoryChecksPage() {
 
   const handleSave = async () => {
     if (!documentId) return;
+    setSaving(true);
     const payload = items.map(it => ({
       product_id: it.product_id,
       actual_qty: it.actual_qty,
@@ -70,17 +74,22 @@ export default function InventoryChecksPage() {
       loadDetail();
     } catch (e: any) {
       alert('保存失败：' + (e.response?.data?.detail || e.message));
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleConfirm = async () => {
     if (!documentId) return;
     if (!confirm('确认后盘点单将锁定，不可再修改。确定要确认吗？')) return;
+    setConfirming(true);
     try {
       await inventoryCheckApi.confirm(documentId);
       loadDetail();
     } catch (e: any) {
       alert('确认失败：' + (e.response?.data?.detail || e.message));
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -92,7 +101,7 @@ export default function InventoryChecksPage() {
       {
         key: 'status',
         title: '状态',
-        render: (r: any) => (
+        render: (r: InventoryCheck) => (
           <span className={r.status === 'confirmed' ? 'text-green-600 font-medium' : 'text-orange-500 font-medium'}>
             {STATUS_LABELS[r.status] || r.status}
           </span>
@@ -100,7 +109,7 @@ export default function InventoryChecksPage() {
       },
       { key: 'item_count', title: '产品数' },
       { key: 'note', title: '备注' },
-      { key: 'confirmed_at', title: '确认时间', render: (r: any) => r.confirmed_at?.slice(0, 19).replace('T', ' ') || '-' },
+      { key: 'confirmed_at', title: '确认时间', render: (r: InventoryCheck) => r.confirmed_at?.slice(0, 19).replace('T', ' ') || '-' },
     ];
 
     return (
@@ -152,7 +161,7 @@ export default function InventoryChecksPage() {
 
       <div className="text-sm text-gray-500 mb-4">
         盘点日期：{detail.check_date}
-        {detail.confirmed_at && <> | 确认时间：{detail.confirmed_at?.slice(0, 19).replace('T', ' ')}</>}
+        {detail.confirmed_at && <> | 确认时间：{detail.confirmed_at.slice(0, 19).replace('T', ' ')}</>}
         {detail.note && <> | 备注：{detail.note}</>}
       </div>
 
@@ -172,7 +181,7 @@ export default function InventoryChecksPage() {
                 <td colSpan={4} className="text-center py-8 text-gray-400">暂无明细</td>
               </tr>
             ) : (
-              items.map((it: any, idx: number) => (
+              items.map((it, idx) => (
                 <tr key={it.product_id} className="border-t hover:bg-gray-50">
                   <td className="px-4 py-3">{it.product_name}</td>
                   <td className="px-4 py-3 font-medium">{it.theoretical_qty}</td>
@@ -208,8 +217,8 @@ export default function InventoryChecksPage() {
 
       {isDraft && (
         <div className="flex gap-3 mt-4">
-          <Button variant="secondary" onClick={handleSave}>保存草稿</Button>
-          <Button onClick={handleConfirm}>确认盘点</Button>
+          <Button variant="secondary" onClick={handleSave} disabled={saving}>保存草稿</Button>
+          <Button onClick={handleConfirm} disabled={confirming}>确认盘点</Button>
         </div>
       )}
     </div>
