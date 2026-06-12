@@ -10,6 +10,7 @@ const navItems = [
   { to: '/returns', label: '退货' },
   { to: '/wastage', label: '损耗' },
   { to: '/store-sales', label: '巡店' },
+  { to: '/inventory-checks', label: '盘点' },
   { to: '/inventory', label: '库存' },
   { to: '/stock-ledger', label: '库存流水' },
   { to: '/transaction-ledger', label: '资金流水' },

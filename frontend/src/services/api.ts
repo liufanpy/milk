@@ -107,6 +107,16 @@ export const inventoryApi = {
   list: () => api.get('/inventory').then(r => r.data),
 };
 
+export const inventoryCheckApi = {
+  create: (check_date?: string, note?: string) =>
+    api.post('/inventory-checks', null, { params: { check_date, note } }).then(r => r.data),
+  list: () => api.get('/inventory-checks').then(r => r.data),
+  get: (id: number) => api.get(`/inventory-checks/${id}`).then(r => r.data),
+  saveItems: (id: number, items: { product_id: number; actual_qty: number | null }[]) =>
+    api.put(`/inventory-checks/${id}/items`, { items }).then(r => r.data),
+  confirm: (id: number) => api.post(`/inventory-checks/${id}/confirm`).then(r => r.data),
+};
+
 // Subscription
 export const subscriptionApi = {
   create: (data: any) => api.post('/subscription-orders', data).then(r => r.data),

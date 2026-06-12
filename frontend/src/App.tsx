@@ -16,6 +16,7 @@ import WastagePage from './pages/WastagePage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import SubscriptionDetailPage from './pages/SubscriptionDetailPage';
 import InventoryPage from './pages/InventoryPage';
+import InventoryChecksPage from './pages/InventoryChecksPage';
 import OperationLogsPage from './pages/OperationLogsPage';
 import StockLedgerPage from './pages/StockLedgerPage';
 import TransactionLedgerPage from './pages/TransactionLedgerPage';
@@ -40,6 +41,8 @@ export default function App() {
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/subscriptions/:id" element={<SubscriptionDetailPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/inventory-checks" element={<InventoryChecksPage />} />
+            <Route path="/inventory-checks/:id" element={<InventoryChecksPage />} />
             <Route path="/logs" element={<OperationLogsPage />} />
             <Route path="/stores" element={<StoresPage />} />
             <Route path="/store-sales" element={<StoreSalesPage />} />
