@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import products, customers, suppliers, purchases, sales, distribution, returns, wastage, subscriptions, inventory, dashboard, operation_logs, stock_ledger, transaction_ledger, stores, store_sales
+from app.api import products, customers, suppliers, purchases, sales, distribution, returns, wastage, subscriptions, inventory, dashboard, operation_logs, stock_ledger, transaction_ledger, stores, store_sales, inventory_checks
 
 api_router = APIRouter()
 api_router.include_router(products.router)
@@ -18,3 +18,4 @@ api_router.include_router(stock_ledger.router)
 api_router.include_router(stores.router)
 api_router.include_router(transaction_ledger.router)
 api_router.include_router(store_sales.router)
+api_router.include_router(inventory_checks.router)
