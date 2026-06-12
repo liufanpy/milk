@@ -6,9 +6,12 @@ class StoreSalesItem(Base):
     __tablename__ = "store_sales_items"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     beginning = Column(Integer, nullable=False, default=0)
     received = Column(Integer, nullable=False, default=0)
     actual_quantity = Column(Integer, nullable=False)
-    sales_quantity = Column(Integer, nullable=False, default=0)
+
+    @property
+    def sales_quantity(self) -> int:
+        return self.beginning + self.received - self.actual_quantity

@@ -31,29 +31,6 @@ def resolve_store(db, name: str) -> int | None:
     return s.id if s else None
 
 
-def resolve_price(customer_id: int, product_id: int, db) -> float:
-    from app.models.product import Product
-    from app.models.customer import Customer
-    from app.models.product_customer_price import ProductCustomerPrice
-
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
-        return 0.0
-
-    custom = db.query(ProductCustomerPrice).filter(
-        ProductCustomerPrice.customer_id == customer_id,
-        ProductCustomerPrice.product_id == product_id,
-    ).first()
-    if custom:
-        return custom.price
-
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    if customer and customer.price_tier == "批发":
-        return product.default_wholesale_price
-
-    return product.retail_price
-
-
 def parse_date(s: str) -> date:
     for fmt in DATE_FORMATS:
         try:

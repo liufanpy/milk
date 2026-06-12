@@ -47,26 +47,8 @@ class SubscriptionService:
     def _resolve_unit_price(self, customer_id: int, product_id: int, unit_price: float | None) -> float:
         if unit_price is not None:
             return unit_price
-
-        from app.models.product import Product
-        product = self.db.query(Product).filter(Product.id == product_id).first()
-        if not product:
-            return 0.0
-
-        from app.models.product_customer_price import ProductCustomerPrice
-        custom = self.db.query(ProductCustomerPrice).filter(
-            ProductCustomerPrice.customer_id == customer_id,
-            ProductCustomerPrice.product_id == product_id,
-        ).first()
-        if custom:
-            return custom.price
-
-        from app.models.customer import Customer
-        customer = self.db.query(Customer).filter(Customer.id == customer_id).first()
-        if customer and customer.price_tier == "批发":
-            return product.default_wholesale_price
-
-        return product.default_retail_price
+        from app.services.pricing import resolve_price
+        return resolve_price(customer_id, product_id, self.db)
 
     def _get_purchase_cost(self, product_id: int) -> float:
         from app.models.product import Product

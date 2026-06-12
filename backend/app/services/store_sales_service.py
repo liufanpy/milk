@@ -1,15 +1,15 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.repositories.store_sales_repo import StoreSalesOrderRepository
 from app.repositories.store_repo import StoreRepository
 from app.services.document_helpers import create_document
+from app.services.pricing import resolve_price
 from app.models.store_sales_order import StoreSalesOrder
 from app.models.store_sales_item import StoreSalesItem
 from app.models.product import Product
 from app.models.store import Store
-from app.models.product_customer_price import ProductCustomerPrice
 from app.schemas.store_sales import StoreSalesCreate
 from app.enums import DocumentType, Direction, TransactionCategory
 
@@ -35,47 +35,49 @@ class StoreSalesService:
         self.store_repo = StoreRepository(db)
         self.repo = StoreSalesOrderRepository(db)
 
-    def _resolve_sale_price(self, customer_id: int, product: Product) -> float:
-        custom = self.db.query(ProductCustomerPrice).filter(
-            ProductCustomerPrice.customer_id == customer_id,
-            ProductCustomerPrice.product_id == product.id,
-        ).first()
-        if custom:
-            return custom.price
-        return product.default_wholesale_price
-
     def _get_last_check_quantity(self, store_id: int, product_id: int, before_date: date) -> int:
         last = (
             self.db.query(StoreSalesItem.actual_quantity)
-            .join(StoreSalesOrder)
+            .join(StoreSalesOrder, StoreSalesItem.document_id == StoreSalesOrder.document_id)
             .filter(
                 StoreSalesOrder.store_id == store_id,
-                StoreSalesOrder.check_date < before_date,
+                StoreSalesOrder.check_date <= before_date,
                 StoreSalesOrder.status == "confirmed",
                 StoreSalesItem.product_id == product_id,
             )
-            .order_by(StoreSalesOrder.check_date.desc())
+            .order_by(StoreSalesOrder.check_date.desc(), StoreSalesOrder.created_at.desc())
             .first()
         )
         return last[0] if last else 0
 
-    def _get_last_check_date(self, store_id: int, before_date: date) -> date | None:
+    def _get_last_movement_id(self, store_id: int) -> int:
         last = (
-            self.db.query(StoreSalesOrder.check_date)
+            self.db.query(StoreSalesOrder.last_movement_id)
             .filter(
                 StoreSalesOrder.store_id == store_id,
-                StoreSalesOrder.check_date < before_date,
                 StoreSalesOrder.status == "confirmed",
             )
-            .order_by(StoreSalesOrder.check_date.desc())
+            .order_by(StoreSalesOrder.created_at.desc())
             .first()
         )
-        return last[0] if last else None
+        return last[0] if last else 0
 
     def create(self, data: StoreSalesCreate):
         store = self.db.query(Store).filter(Store.id == data.store_id).first()
         if not store:
             raise ValueError("店铺不存在")
+
+        products = {p.id: p for p in self.db.query(Product).all()}
+
+        since_id = self._get_last_movement_id(data.store_id)
+
+        precomputed = {}
+        for item in data.items:
+            beginning = self._get_last_check_quantity(data.store_id, item.product_id, data.check_date)
+            received = self.stock_repo.get_store_receive_since(
+                data.store_id, item.product_id, since_id
+            )
+            precomputed[item.product_id] = (beginning, received)
 
         doc = create_document(self.db, DocumentType.store_sales)
         order = StoreSalesOrder(
@@ -87,17 +89,8 @@ class StoreSalesService:
         self.db.add(order)
         self.db.flush()
 
-        products = {p.id: p for p in self.db.query(Product).all()}
-
-        last_check_date = self._get_last_check_date(data.store_id, data.check_date)
-        from_dt = datetime.combine(last_check_date, datetime.min.time()) if last_check_date else datetime.min
-        to_dt = datetime.combine(data.check_date, datetime.min.time())
-
         for item in data.items:
-            beginning = self._get_last_check_quantity(data.store_id, item.product_id, data.check_date)
-            received = self.stock_repo.get_store_receive_between(
-                data.store_id, item.product_id, from_dt, to_dt
-            )
+            beginning, received = precomputed[item.product_id]
             ending = item.actual_quantity
             sales_qty = beginning + received - ending
 
@@ -105,13 +98,18 @@ class StoreSalesService:
             if not product:
                 continue
 
+            if sales_qty < 0:
+                raise ValueError(
+                    f"「{product.name}」实盘数({ending})超过可销售量({beginning + received})，"
+                    f"请核实实盘数量是否正确"
+                )
+
             self.db.add(StoreSalesItem(
                 document_id=doc.id,
                 product_id=item.product_id,
                 beginning=beginning,
                 received=received,
                 actual_quantity=ending,
-                sales_quantity=sales_qty,
             ))
 
             if sales_qty > 0:
@@ -124,7 +122,8 @@ class StoreSalesService:
                     "store_id": data.store_id,
                 }])
 
-                sale_price = self._resolve_sale_price(store.customer_id or 0, product)
+                # 门店与奶站按批发价结算，兜底用 wholesale_price
+                sale_price = resolve_price(store.customer_id or 0, product.id, self.db, fallback="wholesale")
                 revenue = sales_qty * sale_price
                 self.txn_repo.create(
                     customer_id=store.customer_id,
@@ -145,13 +144,14 @@ class StoreSalesService:
                     "store_id": data.store_id,
                 }])
 
+        order.last_movement_id = self.stock_repo.get_max_movement_id()
         self.db.commit()
         return {"id": doc.id, "order_number": doc.order_number}
 
     def list_checks(self, store_id: int | None = None, date_from: str | None = None, date_to: str | None = None):
         from app.models.document import Document
         from app.models.store import Store as StoreModel
-        q = self.db.query(StoreSalesOrder).order_by(StoreSalesOrder.check_date.desc())
+        q = self.db.query(StoreSalesOrder).order_by(StoreSalesOrder.check_date.desc(), StoreSalesOrder.created_at.desc())
         if store_id:
             q = q.filter(StoreSalesOrder.store_id == store_id)
         if date_from:
@@ -195,6 +195,7 @@ class StoreSalesService:
             item_details.append({
                 "product_id": item.product_id,
                 "product_name": p.name if p else "",
+                "quantity": item.sales_quantity,
                 "actual_quantity": item.actual_quantity,
                 "sales_quantity": item.sales_quantity,
                 "beginning": item.beginning,
@@ -279,13 +280,16 @@ class StoreSalesService:
             if not sid:
                 continue
 
+            check_date = _parse_date(date_key) if date_key else date.today()
             doc = create_document(self.db, DocumentType.store_sales)
             order = StoreSalesOrder(
                 document_id=doc.id,
                 store_id=sid,
-                check_date=_parse_date(date_key) if date_key else date.today(),
+                check_date=check_date,
             )
             self.db.add(order)
+
+            since_id = self._get_last_movement_id(sid)
 
             for data in items:
                 pname = (data.get("产品名称") or data.get("product_name") or "").strip()
@@ -294,9 +298,13 @@ class StoreSalesService:
                     errors.append({"row": data.get("index", "?"), "msg": f"产品'{pname}'不存在"})
                     continue
                 actual_qty = int(float(data.get("实盘数量") or data.get("actual_quantity") or 0))
+                beginning = self._get_last_check_quantity(sid, pid, check_date)
+                received = self.stock_repo.get_store_receive_since(sid, pid, since_id)
                 self.db.add(StoreSalesItem(
                     document_id=doc.id,
                     product_id=pid,
+                    beginning=beginning,
+                    received=received,
                     actual_quantity=actual_qty,
                 ))
                 success += 1

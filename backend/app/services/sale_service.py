@@ -10,6 +10,7 @@ from app.models.retail_item import RetailItem
 from app.models.transaction import Transaction
 from app.models.product import Product
 from app.models.customer import Customer
+from app.services.pricing import resolve_price
 from app.enums import DocumentType, Direction, TransactionCategory
 
 SALE_HEADERS = ["产品名称", "product_name", "数量", "quantity", "售价", "unit_price", "客户名称", "customer_name", "日期", "date"]
@@ -33,59 +34,38 @@ class SaleService:
         self.txn_repo = TransactionRepository(db)
         self.retail_repo = RetailOrderRepository(db)
 
-    def create_sale(self, data: SaleCreate):
-        self.stock_repo.validate_stock(data.items)
+    def _create_order(self, customer_id: int | None, items: list[dict], paid: bool = True, note: str = "") -> dict:
+        self.stock_repo.validate_stock(items)
 
         doc = create_document(self.db, DocumentType.retail)
-        order = RetailOrder(
-            document_id=doc.id,
-            customer_id=data.customer_id,
-            status="confirmed",
-            note=data.note,
-        )
+        order = RetailOrder(document_id=doc.id, customer_id=customer_id, status="confirmed", note=note)
         self.db.add(order)
 
         total = 0.0
         movements = []
-        for item in data.items:
-            total += item.quantity * item.unit_price
-            self.db.add(RetailItem(
-                document_id=doc.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-            ))
-            movements.append({
-                "product_id": item.product_id,
-                "direction": Direction.out,
-                "quantity": item.quantity,
-                "source_type": DocumentType.retail,
-                "source_id": doc.id,
-            })
+        for it in items:
+            total += it["quantity"] * it["unit_price"]
+            self.db.add(RetailItem(document_id=doc.id, product_id=it["product_id"],
+                                    quantity=it["quantity"], unit_price=it["unit_price"]))
+            movements.append({"product_id": it["product_id"], "direction": Direction.out,
+                              "quantity": it["quantity"], "source_type": DocumentType.retail, "source_id": doc.id})
 
         self.db.flush()
         self.stock_repo.bulk_create(movements)
 
         if total > 0:
-            self.txn_repo.create(
-                customer_id=data.customer_id,
-                category=TransactionCategory.retail,
-                amount=total,
-                source_type=DocumentType.retail,
-                source_id=doc.id,
-            )
-
-        if data.paid and total > 0:
-            self.txn_repo.create(
-                customer_id=data.customer_id,
-                category=TransactionCategory.payment,
-                amount=total,
-                source_type=DocumentType.retail,
-                source_id=doc.id,
-            )
+            self.txn_repo.create(customer_id=customer_id, category=TransactionCategory.retail,
+                                 amount=total, source_type=DocumentType.retail, source_id=doc.id)
+        if paid and total > 0:
+            self.txn_repo.create(customer_id=customer_id, category=TransactionCategory.payment,
+                                 amount=total, source_type=DocumentType.retail, source_id=doc.id)
 
         self.db.commit()
-        return {"total": total, "item_count": len(data.items), "retail_order_id": doc.id}
+        return {"total": total, "item_count": len(items), "retail_order_id": doc.id}
+
+    def create_sale(self, data: SaleCreate):
+        items = [{"product_id": it.product_id, "quantity": it.quantity, "unit_price": it.unit_price} for it in data.items]
+        return self._create_order(data.customer_id, items, data.paid, data.note)
 
     def list_sales(self):
         orders = self.db.query(RetailOrder).order_by(RetailOrder.created_at.desc()).all()
@@ -276,7 +256,7 @@ class SaleService:
     DFLT_CUSTOMER = "散客"
 
     def _name_maps(self):
-        prods = {p.name: (p.id, p.retail_price) for p in self.db.query(Product).all()}
+        prods = {p.name: p.id for p in self.db.query(Product).all()}
         customers = {c.name: c.id for c in self.db.query(Customer).all()}
         return prods, customers
 
@@ -298,84 +278,59 @@ class SaleService:
             return True
 
         from app.services.csv_importer import parse_csv
-        return parse_csv(file_content, validate, SALE_HEADERS)
+        result = parse_csv(file_content, validate, SALE_HEADERS)
+
+        # 对 OK 行解析价格并回填到售价列
+        for row in result["rows"]:
+            if row["status"] != "ok":
+                continue
+            d = row["data"]
+            raw_price = (d.get("售价") or d.get("unit_price") or "").strip()
+            if not raw_price:
+                cname = (d.get("客户名称") or d.get("customer_name") or "").strip() or self.DFLT_CUSTOMER
+                cid = customers.get(cname)
+                pid = prods.get((d.get("产品名称") or d.get("product_name") or "").strip())
+                if pid:
+                    d["售价"] = str(resolve_price(cid or 0, pid, self.db))
+
+        if "售价" not in result["headers"]:
+            result["headers"].insert(2, "售价")  # 插在数量后面
+
+        return result
 
     def import_confirm(self, rows: list[dict]) -> dict:
         prods, customers = self._name_maps()
         success = 0
         errors: list[dict] = []
 
-        # 按 customer + date 分组
         groups: dict[tuple, list[dict]] = {}
         for row in rows:
             data = row.get("data", row)
             cname = (data.get("客户名称") or data.get("customer_name") or "").strip() or self.DFLT_CUSTOMER
             date_str = (data.get("日期") or data.get("date") or "").strip()
-            key = (cname, date_str or str(date.today()))
-            if key not in groups:
-                groups[key] = []
-            groups[key].append(data)
+            groups.setdefault((cname, date_str or str(date.today())), []).append(data)
 
-        for (cname, date_key), items in groups.items():
+        for (cname, _), items in groups.items():
             cid = customers.get(cname)
-            doc = create_document(self.db, DocumentType.retail)
-            order = RetailOrder(
-                document_id=doc.id,
-                customer_id=cid,
-                status="confirmed",
-            )
-            self.db.add(order)
-
-            total = 0.0
-            movements = []
+            parsed = []
             for data in items:
                 pname = (data.get("产品名称") or data.get("product_name") or "").strip()
                 p = prods.get(pname)
                 if not p:
                     errors.append({"row": data.get("index", "?"), "msg": f"产品'{pname}'不存在"})
                     continue
-                pid, default_price = p
+                pid = p
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
-                price = data.get("售价") or data.get("unit_price") or ""
-                price = float(price) if price else default_price
-                total += qty * price
+                raw_price = (data.get("售价") or data.get("unit_price") or "").strip()
+                if raw_price:
+                    price = float(raw_price)
+                else:
+                    price = resolve_price(cid, pid, self.db)
+                parsed.append({"product_id": pid, "quantity": qty, "unit_price": price})
+            if parsed:
+                self._create_order(cid, parsed)
+                success += len(parsed)
 
-                self.db.add(RetailItem(
-                    document_id=doc.id,
-                    product_id=pid,
-                    quantity=qty,
-                    unit_price=price,
-                ))
-                movements.append({
-                    "product_id": pid,
-                    "direction": Direction.out,
-                    "quantity": qty,
-                    "source_type": DocumentType.retail,
-                    "source_id": doc.id,
-                })
-
-            self.db.flush()
-
-            if movements:
-                self.stock_repo.bulk_create(movements)
-                if total > 0:
-                    self.txn_repo.create(
-                        customer_id=cid,
-                        category=TransactionCategory.retail,
-                        amount=total,
-                        source_type=DocumentType.retail,
-                        source_id=doc.id,
-                    )
-                    self.txn_repo.create(
-                        customer_id=cid,
-                        category=TransactionCategory.payment,
-                        amount=total,
-                        source_type=DocumentType.retail,
-                        source_id=doc.id,
-                    )
-                success += len(movements)
-
-        self.db.commit()
         return {"success": success, "errors": errors}
 
     def export_csv(self):

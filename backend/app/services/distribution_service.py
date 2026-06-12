@@ -8,6 +8,7 @@ from app.services.document_helpers import create_document
 from app.models.distribution_order import DistributionOrder
 from app.models.distribution_order_item import DistributionOrderItem
 from app.schemas.distribution import DistributionCreate, ExchangeCreate
+from app.services.pricing import resolve_price
 from app.enums import DocumentType, Direction, TransactionCategory
 
 DISTRIBUTION_HEADERS = ["产品名称", "product_name", "数量", "quantity", "售价", "unit_price", "客户名称", "customer_name", "店铺名称", "store_name", "日期", "date"]
@@ -118,6 +119,7 @@ class DistributionService:
                 amount=total,
                 source_type=DocumentType.distribution,
                 source_id=doc.id,
+                store_id=store.id if store else None,
             )
 
         order.status = "delivered"
@@ -278,6 +280,7 @@ class DistributionService:
             amount=amount,
             source_type=DocumentType.distribution,
             source_id=document_id,
+            store_id=order.store_id,
         )
 
         amounts = self.txn_repo.get_amounts_by_distribution([document_id])
@@ -302,6 +305,7 @@ class DistributionService:
                 amount=item["amount"],
                 source_type=DocumentType.distribution,
                 source_id=item["id"],
+                store_id=order.store_id,
             )
 
         amounts = self.txn_repo.get_amounts_by_distribution(doc_ids)
@@ -320,7 +324,7 @@ class DistributionService:
     def _name_maps(self):
         from app.models.product import Product
         from app.models.customer import Customer
-        prods = {p.name: (p.id, p.retail_price) for p in self.db.query(Product).all()}
+        prods = {p.name: p.id for p in self.db.query(Product).all()}
         customers = {c.name: c.id for c in self.db.query(Customer).all()}
         stores = {s.name: s for s in self.db.query(self._store_model()).all()}
         return prods, customers, stores
@@ -349,15 +353,46 @@ class DistributionService:
                 return "客户名称为空"
             if cname not in customers:
                 return f"客户'{cname}'不存在"
+            sname = (row.get("店铺名称") or row.get("store_name") or "").strip()
+            if sname and sname not in stores:
+                return f"店铺'{sname}'不存在"
             return True
 
         from app.services.csv_importer import parse_csv
-        return parse_csv(file_content, validate, DISTRIBUTION_HEADERS)
+        result = parse_csv(file_content, validate, DISTRIBUTION_HEADERS)
+
+        for row in result["rows"]:
+            if row["status"] != "ok":
+                continue
+            d = row["data"]
+            raw_price = (d.get("售价") or d.get("unit_price") or "").strip()
+            if not raw_price:
+                cname = (d.get("客户名称") or d.get("customer_name") or "").strip()
+                cid = customers.get(cname)
+                pid = prods.get((d.get("产品名称") or d.get("product_name") or "").strip())
+                if pid:
+                    d["售价"] = str(resolve_price(cid, pid, self.db))
+            # 回填店铺名称
+            sname = (d.get("店铺名称") or d.get("store_name") or "").strip()
+            if not sname:
+                cname = (d.get("客户名称") or d.get("customer_name") or "").strip()
+                cid = customers.get(cname)
+                if cid:
+                    store = self.store_repo.get_by_customer(cid)
+                    if store:
+                        d["店铺名称"] = store.name
+
+        if "售价" not in result["headers"]:
+            result["headers"].insert(2, "售价")
+        if "店铺名称" not in result["headers"]:
+            result["headers"].append("店铺名称")
+
+        return result
 
     def import_confirm(self, rows: list[dict]) -> dict:
         from app.models.product import Product
         from app.models.customer import Customer
-        prods = {p.name: (p.id, p.retail_price) for p in self.db.query(Product).all()}
+        prods = {p.name: p.id for p in self.db.query(Product).all()}
         customers = {c.name: c.id for c in self.db.query(Customer).all()}
         stores = {s.name: s for s in self.db.query(self._store_model()).all()}
 
@@ -379,7 +414,10 @@ class DistributionService:
             if not cid:
                 continue
 
-            store = self.store_repo.get_by_customer(cid)
+            # 店铺：CSV指定 > 客户关联
+            sname = (items[0].get("店铺名称") or items[0].get("store_name") or "").strip() if items else ""
+            store = stores.get(sname) if sname else self.store_repo.get_by_customer(cid)
+
             doc = create_document(self.db, DocumentType.distribution)
             order = DistributionOrder(
                 document_id=doc.id,
@@ -398,10 +436,13 @@ class DistributionService:
                 if not p:
                     errors.append({"row": data.get("index", "?"), "msg": f"产品'{pname}'不存在"})
                     continue
-                pid, default_price = p
+                pid = p
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
-                price = data.get("售价") or data.get("unit_price") or ""
-                price = float(price) if price else default_price
+                raw_price = (data.get("售价") or data.get("unit_price") or "").strip()
+                if raw_price:
+                    price = float(raw_price)
+                else:
+                    price = resolve_price(cid, pid, self.db)
                 total += qty * price
 
                 self.db.add(DistributionOrderItem(
@@ -438,6 +479,7 @@ class DistributionService:
                         amount=total,
                         source_type=DocumentType.distribution,
                         source_id=doc.id,
+                        store_id=store.id if store else None,
                     )
                 success += len([m for m in movements if m["direction"] == Direction.out])
 

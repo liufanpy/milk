@@ -31,3 +31,11 @@ class StoreRepository:
                 setattr(store, k, v)
         self.db.flush()
         return store
+
+    def delete(self, store_id: int) -> bool:
+        store = self.get_by_id(store_id)
+        if not store:
+            return False
+        self.db.delete(store)
+        self.db.flush()
+        return True

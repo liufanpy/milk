@@ -3,20 +3,20 @@ import { useAppStore } from '../store/appStore';
 
 const navItems = [
   { to: '/', label: '看板' },
-  { to: '/products', label: '产品' },
-  { to: '/customers', label: '客户' },
-  { to: '/suppliers', label: '供应商' },
   { to: '/purchases', label: '进货' },
   { to: '/sales', label: '零售' },
-  { to: '/distribution-orders', label: '铺货管理' },
+  { to: '/distribution-orders', label: '铺货' },
+  { to: '/subscriptions', label: '订奶' },
   { to: '/returns', label: '退货' },
   { to: '/wastage', label: '损耗' },
-  { to: '/subscriptions', label: '订奶' },
-  { to: '/stores', label: '店铺管理' },
-  { to: '/store-sales', label: '巡店记录' },
+  { to: '/store-sales', label: '巡店' },
   { to: '/inventory', label: '库存' },
   { to: '/stock-ledger', label: '库存流水' },
   { to: '/transaction-ledger', label: '资金流水' },
+  { to: '/products', label: '产品' },
+  { to: '/customers', label: '客户' },
+  { to: '/suppliers', label: '供应商' },
+  { to: '/stores', label: '店铺' },
   { to: '/logs', label: '日志' },
 ];
 

@@ -149,7 +149,7 @@ export default function SalesPage() {
         <div className="space-y-3">
           <div>
             <label className="text-sm font-medium text-gray-700">客户（留空为散客）</label>
-            <CustomerSelect value={customerId} onChange={setCustomerId} priceTier="零售" />
+            <CustomerSelect value={customerId} onChange={setCustomerId} />
           </div>
           <ItemRowEditor
             items={items}

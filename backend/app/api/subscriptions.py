@@ -28,7 +28,22 @@ def deduct(order_id: int, data: SubscriptionDeduct, svc: SubscriptionService = D
 
 @router.get("")
 def list_orders(svc: SubscriptionService = Depends(get_subscription_service)):
-    return svc.sub_repo.list_all()
+    orders = svc.sub_repo.list_all()
+    doc_ids = [o.document_id for o in orders]
+    docs = {d.id: d for d in svc.db.query(Document).filter(Document.id.in_(doc_ids)).all()}
+    return [
+        {
+            "id": o.document_id,
+            "order_number": docs[o.document_id].order_number if o.document_id in docs else "",
+            "customer_id": o.customer_id,
+            "paid_amount": o.paid_amount,
+            "remaining_amount": o.remaining_amount,
+            "status": o.status,
+            "note": o.note,
+            "created_at": str(o.created_at),
+        }
+        for o in orders
+    ]
 
 
 @router.get("/{order_id}")
@@ -58,6 +73,7 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
                 "quantity": it.quantity,
                 "unit_price": it.unit_price,
                 "is_promo": it.is_promo,
+                "created_at": str(it.created_at) if it.created_at else "",
             }
             for it in items
         ],

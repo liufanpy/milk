@@ -70,22 +70,22 @@ class StockMovementRepository:
             .all()
         )
 
-    def get_store_receive_between(self, store_id: int, product_id: int, from_date, to_date) -> int:
-        """两次盘点之间店铺收货量，JOIN distribution_orders"""
-        from app.models.distribution_order import DistributionOrder
+    def get_store_receive_since(self, store_id: int, product_id: int, since_id: int) -> int:
+        """两轮盘点之间的店铺收货量，基于 stock_movement.id 游标"""
         result = (
             self.db.query(func.sum(StockMovement.quantity))
-            .join(DistributionOrder, StockMovement.source_id == DistributionOrder.document_id)
             .filter(
+                StockMovement.id > since_id,
                 StockMovement.store_id == store_id,
                 StockMovement.product_id == product_id,
                 StockMovement.direction == Direction.in_,
-                StockMovement.source_type == DocumentType.distribution,
-                DistributionOrder.delivery_date >= from_date,
-                DistributionOrder.delivery_date < to_date,
             )
             .scalar()
         )
+        return result or 0
+
+    def get_max_movement_id(self) -> int:
+        result = self.db.query(func.max(StockMovement.id)).scalar()
         return result or 0
 
     def validate_stock(self, items: list):

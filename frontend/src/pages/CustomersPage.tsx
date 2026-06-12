@@ -38,7 +38,7 @@ export default function CustomersPage() {
 
   const [priceCustomerId, setPriceCustomerId] = useState<number | null>(null);
   const [priceModalOpen, setPriceModalOpen] = useState(false);
-  const [priceForm, setPriceForm] = useState({ product_id: '', price: '0' });
+  const [priceForm, setPriceForm] = useState({ product_id: 0, price: '0' });
 
   const { data: customers = [], isLoading } = useCustomers(keyword);
   const { data: products = [] } = useProducts();
@@ -71,7 +71,7 @@ export default function CustomersPage() {
 
   const openPriceModal = (c: Customer) => {
     setPriceCustomerId(c.id);
-    setPriceForm({ product_id: '', price: '0' });
+    setPriceForm({ product_id: 0, price: '0' });
     setPriceModalOpen(true);
   };
 
@@ -79,10 +79,10 @@ export default function CustomersPage() {
     if (!priceCustomerId || !priceForm.product_id) return;
     addPriceMutation.mutate({
       customerId: priceCustomerId,
-      productId: Number(priceForm.product_id),
+      productId: priceForm.product_id,
       price: Number(priceForm.price),
     });
-    setPriceForm({ product_id: '', price: '0' });
+    setPriceForm({ product_id: 0, price: '0' });
   };
 
   const columns = [
@@ -158,10 +158,10 @@ export default function CustomersPage() {
             <p className="text-sm font-medium text-gray-600">新增价格</p>
             <ProductSelect
               value={priceForm.product_id}
-              onChange={(v) => setPriceForm({ ...priceForm, product_id: String(v) })}
+              onChange={(v) => setPriceForm({ ...priceForm, product_id: Number(v) })}
             />
             <Input label="价格" type="number" value={priceForm.price} onChange={(e) => setPriceForm({ ...priceForm, price: e.target.value })} />
-            <Button onClick={handleAddPrice} disabled={!priceForm.product_id || !priceForm.price}>添加</Button>
+            <Button onClick={handleAddPrice} disabled={priceForm.product_id === 0 || !priceForm.price}>添加</Button>
           </div>
         </div>
       </Modal>

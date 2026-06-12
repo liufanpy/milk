@@ -31,47 +31,36 @@ class WastageService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
-    def create_wastage(self, data: WastageCreate):
-        self.stock_repo.validate_stock(data.items)
+    def _create_order(self, items: list[dict], note: str = "") -> dict:
+        self.stock_repo.validate_stock(items)
+        costs = {p.id: p.default_purchase_price for p in self.db.query(Product).all()}
 
         doc = create_document(self.db, DocumentType.wastage)
-        order = WastageOrder(document_id=doc.id, note=data.note)
+        order = WastageOrder(document_id=doc.id, note=note)
         self.db.add(order)
 
-        product_ids = list({item.product_id for item in data.items})
-        costs = {p.id: p.default_purchase_price for p in self.db.query(Product).filter(Product.id.in_(product_ids)).all()}
-
-        movements = []
         total_cost = 0.0
-        for item in data.items:
-            reason = getattr(item, 'reason', 'damaged') or 'damaged'
-            self.db.add(WastageItem(
-                document_id=doc.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                unit_price=costs.get(item.product_id, 0),
-                reason=reason,
-            ))
-            movements.append({
-                "product_id": item.product_id,
-                "direction": Direction.out,
-                "quantity": item.quantity,
-                "source_type": DocumentType.wastage,
-                "source_id": doc.id,
-            })
-            total_cost += item.quantity * costs.get(item.product_id, 0)
+        movements = []
+        for it in items:
+            reason = it.get("reason", "damaged") or "damaged"
+            cost = costs.get(it["product_id"], 0)
+            self.db.add(WastageItem(document_id=doc.id, product_id=it["product_id"],
+                                     quantity=it["quantity"], unit_price=cost, reason=reason))
+            movements.append({"product_id": it["product_id"], "direction": Direction.out,
+                              "quantity": it["quantity"], "source_type": DocumentType.wastage, "source_id": doc.id})
+            total_cost += it["quantity"] * cost
 
         self.db.flush()
         self.stock_repo.bulk_create(movements)
-
         if total_cost > 0:
-            self.txn_repo.create(
-                category=TransactionCategory.wastage,
-                amount=-total_cost,
-            )
+            self.txn_repo.create(category=TransactionCategory.wastage, amount=-total_cost)
 
         self.db.commit()
-        return {"id": doc.id, "item_count": len(data.items), "total_cost": total_cost}
+        return {"id": doc.id, "item_count": len(items), "total_cost": total_cost}
+
+    def create_wastage(self, data: WastageCreate):
+        items = [{"product_id": it.product_id, "quantity": it.quantity, "reason": getattr(it, 'reason', 'damaged')} for it in data.items]
+        return self._create_order(items, data.note)
 
     def list_wastage(self):
         orders = self.wastage_repo.list_all()
@@ -205,18 +194,10 @@ class WastageService:
         for row in rows:
             data = row.get("data", row)
             date_str = (data.get("日期") or data.get("date") or "").strip()
-            key = date_str or str(date.today())
-            if key not in groups:
-                groups[key] = []
-            groups[key].append(data)
+            groups.setdefault(date_str or str(date.today()), []).append(data)
 
         for _, items in groups.items():
-            doc = create_document(self.db, DocumentType.wastage)
-            order = WastageOrder(document_id=doc.id)
-            self.db.add(order)
-
-            total_cost = 0.0
-            movements = []
+            parsed = []
             for data in items:
                 pname = (data.get("产品名称") or data.get("product_name") or "").strip()
                 p = prods.get(pname)
@@ -226,32 +207,11 @@ class WastageService:
                 pid, default_cost = p
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
                 reason = (data.get("原因") or data.get("reason") or "").strip() or "damaged"
-                total_cost += qty * default_cost
+                parsed.append({"product_id": pid, "quantity": qty, "reason": reason})
+            if parsed:
+                self._create_order(parsed)
+                success += len(parsed)
 
-                self.db.add(WastageItem(
-                    document_id=doc.id,
-                    product_id=pid,
-                    quantity=qty,
-                    unit_price=default_cost,
-                    reason=reason,
-                ))
-                movements.append({
-                    "product_id": pid,
-                    "direction": Direction.out,
-                    "quantity": qty,
-                    "source_type": DocumentType.wastage,
-                    "source_id": doc.id,
-                })
-
-            self.db.flush()
-
-            if movements:
-                self.stock_repo.bulk_create(movements)
-                if total_cost > 0:
-                    self.txn_repo.create(category=TransactionCategory.wastage, amount=-total_cost)
-                success += len(movements)
-
-        self.db.commit()
         return {"success": success, "errors": errors}
 
     def export_csv(self):

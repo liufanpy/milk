@@ -10,6 +10,7 @@ from app.models.return_item import ReturnItem
 from app.models.transaction import Transaction
 from app.models.product import Product
 from app.models.customer import Customer
+from app.services.pricing import resolve_price
 from app.enums import DocumentType, Direction, TransactionCategory
 
 RETURN_HEADERS = ["产品名称", "product_name", "数量", "quantity", "退款金额", "unit_price", "客户名称", "customer_name", "日期", "date"]
@@ -33,43 +34,30 @@ class ReturnService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
-    def create_return(self, data: ReturnCreate):
+    def _create_order(self, customer_id: int, items: list[dict], note: str = "") -> dict:
         doc = create_document(self.db, DocumentType.return_order)
-        order = ReturnOrder(
-            document_id=doc.id,
-            customer_id=data.customer_id,
-            note=data.note,
-        )
+        order = ReturnOrder(document_id=doc.id, customer_id=customer_id, note=note)
         self.db.add(order)
 
         refund_total = 0.0
-        for item in data.items:
-            self.db.add(ReturnItem(
-                document_id=doc.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-            ))
-            self.stock_repo.bulk_create([{
-                "product_id": item.product_id,
-                "direction": Direction.in_,
-                "quantity": item.quantity,
-                "source_type": DocumentType.return_order,
-                "source_id": doc.id,
-            }])
-            refund_total += item.quantity * item.unit_price
+        for it in items:
+            self.db.add(ReturnItem(document_id=doc.id, product_id=it["product_id"],
+                                    quantity=it["quantity"], unit_price=it["unit_price"]))
+            self.stock_repo.bulk_create([{"product_id": it["product_id"], "direction": Direction.in_,
+                                          "quantity": it["quantity"], "source_type": DocumentType.return_order,
+                                          "source_id": doc.id}])
+            refund_total += it["quantity"] * it["unit_price"]
 
         if refund_total > 0:
-            self.txn_repo.create(
-                customer_id=data.customer_id,
-                category=TransactionCategory.refund,
-                amount=refund_total,
-                source_type=DocumentType.return_order,
-                source_id=doc.id,
-            )
+            self.txn_repo.create(customer_id=customer_id, category=TransactionCategory.refund,
+                                 amount=refund_total, source_type=DocumentType.return_order, source_id=doc.id)
 
         self.db.commit()
         return {"id": doc.id, "refund_total": refund_total}
+
+    def create_return(self, data: ReturnCreate):
+        items = [{"product_id": it.product_id, "quantity": it.quantity, "unit_price": it.unit_price} for it in data.items]
+        return self._create_order(data.customer_id, items, data.note)
 
     def list_returns(self):
         orders = self.return_repo.list_all()
@@ -217,7 +205,7 @@ class ReturnService:
         return {"id": document_id, "status": "cancelled"}
 
     def _name_maps(self):
-        prods = {p.name: (p.id, p.retail_price) for p in self.db.query(Product).all()}
+        prods = {p.name: p.id for p in self.db.query(Product).all()}
         customers = {c.name: c.id for c in self.db.query(Customer).all()}
         return prods, customers
 
@@ -244,7 +232,24 @@ class ReturnService:
             return True
 
         from app.services.csv_importer import parse_csv
-        return parse_csv(file_content, validate, RETURN_HEADERS)
+        result = parse_csv(file_content, validate, RETURN_HEADERS)
+
+        for row in result["rows"]:
+            if row["status"] != "ok":
+                continue
+            d = row["data"]
+            raw_price = (d.get("退款金额") or d.get("unit_price") or "").strip()
+            if not raw_price:
+                cname = (d.get("客户名称") or d.get("customer_name") or "").strip()
+                cid = customers.get(cname)
+                pid = prods.get((d.get("产品名称") or d.get("product_name") or "").strip())
+                if pid:
+                    d["退款金额"] = str(resolve_price(cid, pid, self.db))
+
+        if "退款金额" not in result["headers"]:
+            result["headers"].insert(2, "退款金额")
+
+        return result
 
     def import_confirm(self, rows: list[dict]) -> dict:
         prods, customers = self._name_maps()
@@ -256,53 +261,31 @@ class ReturnService:
             data = row.get("data", row)
             cname = (data.get("客户名称") or data.get("customer_name") or "").strip()
             date_str = (data.get("日期") or data.get("date") or "").strip()
-            key = (cname, date_str or str(date.today()))
-            if key not in groups:
-                groups[key] = []
-            groups[key].append(data)
+            groups.setdefault((cname, date_str or str(date.today())), []).append(data)
 
         for (cname, _), items in groups.items():
             cid = customers.get(cname)
             if not cid:
                 continue
-
-            doc = create_document(self.db, DocumentType.return_order)
-            order = ReturnOrder(document_id=doc.id, customer_id=cid)
-            self.db.add(order)
-
-            refund_total = 0.0
+            parsed = []
             for data in items:
                 pname = (data.get("产品名称") or data.get("product_name") or "").strip()
                 p = prods.get(pname)
                 if not p:
                     errors.append({"row": data.get("index", "?"), "msg": f"产品'{pname}'不存在"})
                     continue
-                pid, default_price = p
+                pid = p
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
-                price = data.get("退款金额") or data.get("unit_price") or ""
-                price = float(price) if price else default_price
-                refund_total += qty * price
+                raw_price = (data.get("退款金额") or data.get("unit_price") or "").strip()
+                if raw_price:
+                    price = float(raw_price)
+                else:
+                    price = resolve_price(cid, pid, self.db)
+                parsed.append({"product_id": pid, "quantity": qty, "unit_price": price})
+            if parsed:
+                self._create_order(cid, parsed)
+                success += len(parsed)
 
-                self.db.add(ReturnItem(document_id=doc.id, product_id=pid, quantity=qty, unit_price=price))
-                self.stock_repo.bulk_create([{
-                    "product_id": pid,
-                    "direction": Direction.in_,
-                    "quantity": qty,
-                    "source_type": DocumentType.return_order,
-                    "source_id": doc.id,
-                }])
-
-            if refund_total > 0:
-                self.txn_repo.create(
-                    customer_id=cid,
-                    category=TransactionCategory.refund,
-                    amount=refund_total,
-                    source_type=DocumentType.return_order,
-                    source_id=doc.id,
-                )
-            success += len(items)
-
-        self.db.commit()
         return {"success": success, "errors": errors}
 
     def export_csv(self):

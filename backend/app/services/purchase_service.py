@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
 from app.repositories.stock_movement_repo import StockMovementRepository
 from app.repositories.transaction_repo import TransactionRepository
@@ -30,38 +30,78 @@ class PurchaseService:
         self.stock_repo = StockMovementRepository(db)
         self.txn_repo = TransactionRepository(db)
 
-    # ── 创建进货单 ────────────────────────────────
+    # ── 核心：创建进货单 + 品项 + 库存 + 资金 ──────
 
-    def create_purchase(self, data: PurchaseCreate):
-        total = sum(item.quantity * item.unit_price for item in data.items)
+    def _create_order(self, supplier_id: int, purchase_date: date, items: list[dict], status: str = "confirmed", note: str = "") -> dict:
+        """items: [{"product_id": int, "quantity": int, "unit_price": float, "production_date": date|None}]"""
+        shelf_life_map = {p.id: p.shelf_life_days for p in self.db.query(Product).all()}
+        total = sum(it["quantity"] * it["unit_price"] for it in items)
+
         doc = create_document(self.db, DocumentType.purchase)
         order = PurchaseOrder(
             document_id=doc.id,
-            supplier_id=data.supplier_id,
-            purchase_date=data.purchase_date,
+            supplier_id=supplier_id,
+            purchase_date=purchase_date,
             total_amount=total,
-            note=data.note,
-            status=data.status,
+            note=note,
+            status=status,
         )
         self.db.add(order)
 
-        for item in data.items:
+        movements = []
+        for it in items:
+            prod_date = it.get("production_date") or date.today()
+            expiry = it.get("expiry_date")
+            if not expiry:
+                sl = shelf_life_map.get(it["product_id"], 0)
+                if sl:
+                    expiry = prod_date + timedelta(days=sl)
+
             self.db.add(PurchaseItem(
                 document_id=doc.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                production_date=getattr(item, 'production_date', None),
-                expiry_date=getattr(item, 'expiry_date', None),
+                product_id=it["product_id"],
+                quantity=it["quantity"],
+                unit_price=it["unit_price"],
+                production_date=prod_date,
+                expiry_date=expiry,
             ))
+            movements.append({
+                "product_id": it["product_id"],
+                "direction": Direction.in_,
+                "quantity": it["quantity"],
+                "source_type": DocumentType.purchase,
+                "source_id": doc.id,
+            })
 
         self.db.flush()
 
-        if data.status == "confirmed":
-            self._confirm_items(doc.id, data.items)
+        if status == "confirmed" and movements:
+            self.stock_repo.bulk_create(movements)
+        if status == "confirmed" and total > 0:
+            self.txn_repo.create(
+                category=TransactionCategory.purchase,
+                amount=total,
+                source_type=DocumentType.purchase,
+                source_id=doc.id,
+            )
 
         self.db.commit()
-        return {"id": doc.id, "order_number": doc.order_number, "status": order.status}
+        return {"id": doc.id, "order_number": doc.order_number, "status": status}
+
+    # ── 创建进货单 ────────────────────────────────
+
+    def create_purchase(self, data: PurchaseCreate):
+        items = [
+            {
+                "product_id": it.product_id,
+                "quantity": it.quantity,
+                "unit_price": it.unit_price,
+                "production_date": getattr(it, 'production_date', None),
+                "expiry_date": getattr(it, 'expiry_date', None),
+            }
+            for it in data.items
+        ]
+        return self._create_order(data.supplier_id, data.purchase_date, items, data.status, data.note)
 
     # ── 确认草稿单 ────────────────────────────────
 
@@ -72,18 +112,17 @@ class PurchaseService:
         if order.status != "draft":
             raise ValueError("仅草稿状态可确认")
 
-        order.status = "confirmed"
-        self._confirm_items(document_id, items or [])
-        self.db.commit()
-        return {"id": document_id, "status": "confirmed"}
+        # 前端没传 items 时，从 purchase_items 表读取
+        if not items:
+            db_items = self.db.query(PurchaseItem).filter(PurchaseItem.document_id == document_id).all()
+            items = [{"product_id": pi.product_id, "quantity": pi.quantity, "unit_price": pi.unit_price} for pi in db_items]
 
-    def _confirm_items(self, document_id: int, items: list):
         movements = []
         total = 0.0
-        for item in items:
-            qty = item["quantity"] if isinstance(item, dict) else item.quantity
-            cost = item["unit_price"] if isinstance(item, dict) else item.unit_price
-            pid = item["product_id"] if isinstance(item, dict) else item.product_id
+        for it in items:
+            qty = it["quantity"] if isinstance(it, dict) else it.quantity
+            cost = it["unit_price"] if isinstance(it, dict) else it.unit_price
+            pid = it["product_id"] if isinstance(it, dict) else it.product_id
             total += qty * cost
             movements.append({
                 "product_id": pid,
@@ -95,15 +134,18 @@ class PurchaseService:
 
         if movements:
             self.stock_repo.bulk_create(movements)
-
         if total > 0:
-            order = self.db.query(PurchaseOrder).filter(PurchaseOrder.document_id == document_id).first()
+            order.total_amount = total
             self.txn_repo.create(
                 category=TransactionCategory.purchase,
                 amount=total,
                 source_type=DocumentType.purchase,
                 source_id=document_id,
             )
+
+        order.status = "confirmed"
+        self.db.commit()
+        return {"id": document_id, "status": "confirmed"}
 
     # ── 撤销进货单 ────────────────────────────────
 
@@ -166,11 +208,9 @@ class PurchaseService:
             .order_by(PurchaseOrder.created_at.desc())
             .all()
         )
-        docs = {d.id: d for d in self.db.query(
-            self._doc_model()
-        ).filter(
-            self._doc_model().id.in_([o.document_id for o in orders])
-        ).all()}
+        from app.models.document import Document
+        doc_ids = [o.document_id for o in orders]
+        docs = {d.id: d for d in self.db.query(Document).filter(Document.id.in_(doc_ids)).all()}
         suppliers = {s.id: s.name for s in self.db.query(Supplier).all()}
         return [
             {
@@ -230,10 +270,6 @@ class PurchaseService:
         suppliers = {s.name: s.id for s in self.db.query(Supplier).all()}
         return prods, suppliers
 
-    def _doc_model(self):
-        from app.models.document import Document
-        return Document
-
     def import_preview(self, file_content: bytes) -> dict:
         prods, suppliers = self._name_maps()
 
@@ -255,7 +291,30 @@ class PurchaseService:
             return True
 
         from app.services.csv_importer import parse_csv
-        return parse_csv(file_content, validate, PURCHASE_HEADERS)
+        result = parse_csv(file_content, validate, PURCHASE_HEADERS)
+
+        for row in result["rows"]:
+            if row["status"] != "ok":
+                continue
+            d = row["data"]
+            # 回填进价
+            raw_price = (d.get("进价") or d.get("unit_price") or "").strip()
+            if not raw_price:
+                pname = (d.get("产品名称") or d.get("product_name") or "").strip()
+                p = prods.get(pname)
+                if p:
+                    d["进价"] = str(p[1])  # default_purchase_price
+            # 回填供应商
+            supname = (d.get("供应商名称") or d.get("supplier_name") or "").strip()
+            if not supname:
+                d["供应商名称"] = self.DFLT_SUPPLIER
+
+        if "进价" not in result["headers"]:
+            result["headers"].insert(2, "进价")
+        if "供应商名称" not in result["headers"]:
+            result["headers"].append("供应商名称")
+
+        return result
 
     def import_confirm(self, rows: list[dict]) -> dict:
         prods, suppliers = self._name_maps()
@@ -268,23 +327,12 @@ class PurchaseService:
             data = row.get("data", row)
             date_str = (data.get("日期") or data.get("date") or "").strip()
             key = date_str or str(date.today())
-            if key not in groups:
-                groups[key] = []
-            groups[key].append(data)
+            groups.setdefault(key, []).append(data)
 
         for grp_key, items in groups.items():
-            doc = create_document(self.db, DocumentType.purchase)
-            order = PurchaseOrder(
-                document_id=doc.id,
-                supplier_id=0,  # 临时，下面会设
-                purchase_date=_parse_date(grp_key) if grp_key else date.today(),
-                total_amount=0.0,
-                status="confirmed",
-            )
-
-            total = 0.0
-            movements = []
-            item_objs = []
+            buy_date = _parse_date(grp_key) if grp_key else date.today()
+            sid = 0
+            parsed_items = []
             for data in items:
                 pname = (data.get("产品名称") or data.get("product_name") or "").strip()
                 p = prods.get(pname)
@@ -294,49 +342,17 @@ class PurchaseService:
                 pid, default_cost = p
                 supname = (data.get("供应商名称") or data.get("supplier_name") or "").strip() or self.DFLT_SUPPLIER
                 sid = suppliers.get(supname, 0)
-                order.supplier_id = sid
-
                 qty = int(float(data.get("数量") or data.get("quantity") or 0))
-                cost = data.get("进价") or data.get("unit_price") or ""
-                cost = float(cost) if cost else default_cost
+                cost = float(data.get("进价") or data.get("unit_price") or default_cost)
                 date_str2 = (data.get("日期") or data.get("date") or "").strip()
                 item_date = _parse_date(date_str2) if date_str2 else date.today()
-                total += qty * cost
-
-                item_objs.append(PurchaseItem(
-                    document_id=doc.id,
-                    product_id=pid,
-                    quantity=qty,
-                    unit_price=cost,
-                    production_date=item_date,
-                ))
-                movements.append({
-                    "product_id": pid,
-                    "direction": Direction.in_,
-                    "quantity": qty,
-                    "source_type": DocumentType.purchase,
-                    "source_id": doc.id,
+                parsed_items.append({
+                    "product_id": pid, "quantity": qty, "unit_price": cost,
+                    "production_date": item_date,
                 })
 
-            if not item_objs:
-                continue
+            if parsed_items:
+                self._create_order(sid, buy_date, parsed_items)
+                success += len(parsed_items)
 
-            self.db.add(order)
-            for obj in item_objs:
-                self.db.add(obj)
-            self.db.flush()
-
-            if movements:
-                self.stock_repo.bulk_create(movements)
-                if total > 0:
-                    self.txn_repo.create(
-                        category=TransactionCategory.purchase,
-                        amount=total,
-                        source_type=DocumentType.purchase,
-                        source_id=doc.id,
-                    )
-                order.total_amount = total
-                success += len(movements)
-
-        self.db.commit()
         return {"success": success, "errors": errors}

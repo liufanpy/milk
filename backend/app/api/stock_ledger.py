@@ -5,8 +5,26 @@ from app.database import get_db
 from app.models.stock_movement import StockMovement
 from app.models.document import Document
 from app.models.product import Product
+from app.models.store import Store
+from app.models.purchase_order import PurchaseOrder
+from app.models.retail_order import RetailOrder
+from app.models.distribution_order import DistributionOrder
+from app.models.return_order import ReturnOrder
+from app.models.wastage_order import WastageOrder
+from app.models.subscription_order import SubscriptionOrder
+from app.models.store_sales_order import StoreSalesOrder
 
 router = APIRouter(prefix="/api/stock-ledger", tags=["stock-ledger"])
+
+_ORDER_MODELS = [PurchaseOrder, RetailOrder, DistributionOrder, ReturnOrder, WastageOrder, SubscriptionOrder, StoreSalesOrder]
+
+
+def _cancelled_doc_ids(db: Session) -> set:
+    ids: set[int] = set()
+    for model in _ORDER_MODELS:
+        for row in db.query(model.document_id).filter(model.status == "cancelled").all():
+            ids.add(row[0])
+    return ids
 
 
 def _order_number_map(db: Session, movements: list) -> dict:
@@ -26,13 +44,23 @@ def list_stock_ledger(
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     order_number: str | None = Query(None),
+    hide_cancelled: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     q = db.query(StockMovement).order_by(StockMovement.created_at.asc())
 
+    if hide_cancelled:
+        cancelled = _cancelled_doc_ids(db)
+        if cancelled:
+            q = q.filter(StockMovement.source_id.notin_(cancelled))
+
     if product_id:
         q = q.filter(StockMovement.product_id == product_id)
-    if store_id is not None:
+    if store_id == 0:
+        q = q.filter(StockMovement.store_id.is_(None))
+    elif store_id == -1:
+        q = q.filter(StockMovement.store_id.isnot(None))
+    elif store_id and store_id > 0:
         q = q.filter(StockMovement.store_id == store_id)
     if direction:
         q = q.filter(StockMovement.direction == direction)
@@ -54,6 +82,8 @@ def list_stock_ledger(
         return []
 
     products = {p.id: p.name for p in db.query(Product).all()}
+    store_ids = {m.store_id for m in movements if m.store_id}
+    stores = {s.id: s.name for s in db.query(Store).filter(Store.id.in_(store_ids)).all()}
     order_numbers = _order_number_map(db, movements)
 
     balances: dict[int, dict] = {}
@@ -78,6 +108,7 @@ def list_stock_ledger(
             "source_type": m.source_type.value if m.source_type and hasattr(m.source_type, 'value') else m.source_type,
             "order_number": order_numbers.get(m.id, ""),
             "store_id": m.store_id,
+            "store_name": stores.get(m.store_id, "总仓") if m.store_id else "总仓",
             "created_at": str(m.created_at),
         })
 

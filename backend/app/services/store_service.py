@@ -2,6 +2,10 @@ from sqlalchemy.orm import Session
 from app.repositories.store_repo import StoreRepository
 from app.schemas.store import StoreCreate, StoreUpdate
 from app.models.customer import Customer
+from app.services.csv_importer import parse_csv
+from app.services.import_helpers import make_csv_response
+
+STORE_HEADERS = ["name", "名称", "customer_name", "客户名称", "address", "地址"]
 
 
 class StoreService:
@@ -55,3 +59,54 @@ class StoreService:
             raise ValueError("店铺不存在")
         self.db.commit()
         return {"id": store.id}
+
+    def delete(self, store_id: int) -> dict:
+        ok = self.repo.delete(store_id)
+        if not ok:
+            raise ValueError("店铺不存在")
+        self.db.commit()
+        return {"id": store_id, "deleted": True}
+
+    def export_csv(self):
+        stores = self.list_stores()
+        rows = []
+        for s in stores:
+            rows.append({
+                "名称": s["name"],
+                "客户名称": s["customer_name"],
+                "地址": s["address"],
+                "状态": s["status"],
+            })
+        return make_csv_response(rows, "stores.csv")
+
+    def import_preview(self, file_content: bytes) -> dict:
+        def validate(row: dict) -> str | bool:
+            name = (row.get("name") or row.get("名称") or "").strip()
+            if not name:
+                return "名称为空"
+            return True
+        return parse_csv(file_content, validate, STORE_HEADERS)
+
+    def import_confirm(self, rows: list[dict]) -> dict:
+        success = 0
+        errors: list[dict] = []
+        customers = {c.name: c.id for c in self.db.query(Customer).all()}
+        for row in rows:
+            data = row.get("data", row)
+            name = (data.get("name") or data.get("名称") or "").strip()
+            if not name:
+                errors.append({"row": row.get("index", "?"), "msg": "名称为空"})
+                continue
+            cname = (data.get("customer_name") or data.get("客户名称") or "").strip()
+            cid = customers.get(cname) if cname else None
+            try:
+                self.repo.create(
+                    name=name,
+                    customer_id=cid,
+                    address=(data.get("address") or data.get("地址") or "").strip(),
+                )
+                success += 1
+            except Exception as e:
+                errors.append({"row": row.get("index", "?"), "msg": str(e)})
+        self.db.commit()
+        return {"success": success, "errors": errors}

@@ -5,8 +5,26 @@ from app.database import get_db
 from app.models.transaction import Transaction
 from app.models.document import Document
 from app.models.customer import Customer
+from app.models.store import Store
+from app.models.purchase_order import PurchaseOrder
+from app.models.retail_order import RetailOrder
+from app.models.distribution_order import DistributionOrder
+from app.models.return_order import ReturnOrder
+from app.models.wastage_order import WastageOrder
+from app.models.subscription_order import SubscriptionOrder
+from app.models.store_sales_order import StoreSalesOrder
 
 router = APIRouter(prefix="/api/transaction-ledger", tags=["transaction-ledger"])
+
+_ORDER_MODELS = [PurchaseOrder, RetailOrder, DistributionOrder, ReturnOrder, WastageOrder, SubscriptionOrder, StoreSalesOrder]
+
+
+def _cancelled_doc_ids(db: Session) -> set:
+    ids: set[int] = set()
+    for model in _ORDER_MODELS:
+        for row in db.query(model.document_id).filter(model.status == "cancelled").all():
+            ids.add(row[0])
+    return ids
 
 
 def _order_number_map(db: Session, txns: list) -> dict:
@@ -25,13 +43,23 @@ def list_transaction_ledger(
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     order_number: str | None = Query(None),
+    hide_cancelled: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     q = db.query(Transaction).order_by(Transaction.created_at.asc())
 
+    if hide_cancelled:
+        cancelled = _cancelled_doc_ids(db)
+        if cancelled:
+            q = q.filter(Transaction.source_id.notin_(cancelled))
+
     if customer_id:
         q = q.filter(Transaction.customer_id == customer_id)
-    if store_id is not None:
+    if store_id == 0:
+        q = q.filter(Transaction.store_id.is_(None))
+    elif store_id == -1:
+        q = q.filter(Transaction.store_id.isnot(None))
+    elif store_id and store_id > 0:
         q = q.filter(Transaction.store_id == store_id)
     if category:
         q = q.filter(Transaction.category == category)
@@ -51,6 +79,8 @@ def list_transaction_ledger(
         return []
 
     customers = {c.id: c.name for c in db.query(Customer).all()}
+    store_ids = {t.store_id for t in txns if t.store_id}
+    stores = {s.id: s.name for s in db.query(Store).filter(Store.id.in_(store_ids)).all()}
     order_numbers = _order_number_map(db, txns)
 
     balances: dict[int, float] = {}
@@ -61,11 +91,11 @@ def list_transaction_ledger(
             name = customers.get(t.customer_id, "")
             balances.setdefault(t.customer_id, 0.0)
             cat_val = t.category.value if hasattr(t.category, 'value') else t.category
-            if cat_val in ("distribution", "retail", "subscription"):
+            if cat_val in ("distribution", "retail"):
                 balances[t.customer_id] += t.amount
             elif cat_val in ("payment", "refund"):
                 balances[t.customer_id] -= t.amount
-            bal = balances[t.customer_id]
+            bal = balances[t.customer_id] if cat_val in ("distribution", "retail", "payment", "refund") else None
         else:
             bal = None
 
@@ -76,6 +106,8 @@ def list_transaction_ledger(
             "amount": t.amount,
             "balance": round(bal, 2) if bal is not None else None,
             "order_number": order_numbers.get(t.id, ""),
+            "store_name": stores.get(t.store_id, "总仓") if t.store_id else "总仓",
+            "store_id": t.store_id,
             "created_at": str(t.created_at),
         })
 

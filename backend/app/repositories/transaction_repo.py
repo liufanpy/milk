@@ -27,7 +27,6 @@ class TransactionRepository:
                     (Transaction.category.in_([
                         TransactionCategory.distribution,
                         TransactionCategory.retail,
-                        TransactionCategory.subscription,
                     ]), Transaction.amount),
                     (Transaction.category == TransactionCategory.payment, -Transaction.amount),
                     (Transaction.category == TransactionCategory.refund, -Transaction.amount),
@@ -42,7 +41,6 @@ class TransactionRepository:
             (Transaction.category.in_([
                 TransactionCategory.distribution,
                 TransactionCategory.retail,
-                TransactionCategory.subscription,
             ]), Transaction.amount),
             (Transaction.category == TransactionCategory.payment, -Transaction.amount),
             (Transaction.category == TransactionCategory.refund, -Transaction.amount),

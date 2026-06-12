@@ -107,27 +107,7 @@ git commit -m "feat: dashboard API 支持时间范围参数 + 新增成本和毛
 
 ---
 
-### Task 2: 后端 — 添加 Product import
-
-**Files:**
-- Modify: `backend/app/api/dashboard.py` 顶部
-
-如果 Task 1 还没 import `Product`，补充：
-
-```python
-from app.models.product import Product
-```
-
-- [ ] **Step 1: Commit**
-
-```bash
-git add backend/app/api/dashboard.py
-git commit -m "fix: dashboard 补充 Product import"
-```
-
----
-
-### Task 3: 前端 — 时间筛选组件 + Dashboard 页面重构
+### Task 2: 前端 — 时间筛选组件 + Dashboard 页面重构
 
 **Files:**
 - Create: `frontend/src/components/business/TimeRangeFilter.tsx`
@@ -355,7 +335,7 @@ git commit -m "feat: dashboard 时间筛选 + 成本/毛利展示"
 
 ---
 
-### Task 4: 端到端验证
+### Task 3: 端到端验证
 
 - [ ] **Step 1: 启动前后端，打开 dashboard 页面**
 

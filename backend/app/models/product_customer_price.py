@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, ForeignKey, UniqueConstraint, Index
 from app.database import Base
 
 
@@ -12,4 +12,5 @@ class ProductCustomerPrice(Base):
 
     __table_args__ = (
         UniqueConstraint("product_id", "customer_id", name="uq_product_customer"),
+        Index("ix_pcp_customer", "customer_id"),
     )
